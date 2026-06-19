@@ -211,7 +211,26 @@
     el.popLayer.appendChild(d); setTimeout(function () { d.remove(); }, 900);
   }
 
+  // Pick ONE chiptune cue per event batch (priority order) so cascades don't spam sound.
+  function sfxForEvents(events) {
+    if (!window.OT_SFX) return;
+    var has = {}, duelWin = false;
+    for (var i = 0; i < events.length; i++) {
+      has[events[i].type] = true;
+      if (events[i].type === "duel" && events[i].success) duelWin = true;
+    }
+    if (has.goal) OT_SFX.play("goal");
+    else if (has.gameover) OT_SFX.play("lose");
+    else if (has.levelup) OT_SFX.play("levelup");
+    else if (has.medkit) OT_SFX.play("medkit");
+    else if (duelWin) OT_SFX.play("tackle");
+    else if (has.mark) OT_SFX.play("mark");
+    else if (has.reveal) OT_SFX.play("reveal");
+    else if (has.illegal || has.blocked) OT_SFX.play("deny");
+  }
+
   function reactToEvents(events) {
+    sfxForEvents(events);
     renderer.onEvents(events, performance.now());
     events.forEach(function (e) {
       if (e.type === "duel" && e.success) {
@@ -299,10 +318,12 @@
 
   // ── stadium ambience: starts on first user gesture (autoplay policy); mute persists ──
   var muted = localStorage.getItem("ot_muted") === "1";
+  if (window.OT_SFX) OT_SFX.setMuted(muted);
   var ambience = new Audio("assets/audio/stadium-ambience.mp3");
   ambience.loop = true; ambience.volume = 0.35; ambience.preload = "auto";
   var audioStarted = false;
   function startAudio() {
+    if (window.OT_SFX) OT_SFX.ensure();
     if (audioStarted || muted) return;
     audioStarted = true;
     var p = ambience.play();
@@ -317,6 +338,7 @@
   el.btnSound.addEventListener("click", function () {
     muted = !muted;
     try { localStorage.setItem("ot_muted", muted ? "1" : "0"); } catch (e) {}
+    if (window.OT_SFX) OT_SFX.setMuted(muted);
     if (muted) ambience.pause(); else { audioStarted = false; startAudio(); }
     refreshSoundBtn();
   });

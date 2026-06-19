@@ -24,6 +24,7 @@
     guideTabs: document.getElementById("guide-tabs"),
     canvas: document.getElementById("game"),
     stage: document.getElementById("stage"),
+    boardWrap: document.getElementById("board-wrap"),
     scout: document.getElementById("scout"),
     btnLevel: document.getElementById("btn-level"),
     skill: document.getElementById("skill-val"),
@@ -143,6 +144,8 @@
     lastBanner = null; hideBanner(); updateHUD();
     el.seed.textContent = seedLabel() + " · " + diffLabel(difficulty);
     showScreen("game");
+    // Desktop board panel may scroll; start showing the kickoff (bottom, where the ball is).
+    requestAnimationFrame(function () { if (el.boardWrap) el.boardWrap.scrollTop = el.boardWrap.scrollHeight; });
   }
   function startDaily() { newGame(diffParam || "normal", RNG.dailyKey(dayOverride)); }
   function startPractice(key) {
@@ -360,9 +363,17 @@
   // ── layout + loop ────────────────────────────────────────────────────────
   function resize() {
     if (!renderer) return;
-    var maxW = el.app.clientWidth - 24;
-    var maxH = window.innerHeight - el.stage.getBoundingClientRect().top - 70;
-    renderer.fitTo(maxW, Math.max(220, maxH));
+    if (window.innerWidth >= 900) {
+      // Desktop: scale the board up to its column width (integer, crisp); the board panel
+      // scrolls vertically when the tall pitch exceeds the viewport. Capped at ×3.
+      var availW = (el.boardWrap ? el.boardWrap.clientWidth : el.app.clientWidth) - 4;
+      renderer.setScale(Math.max(1, Math.min(3, Math.floor(availW / renderer.W))));
+    } else {
+      // Mobile: fit the whole board on screen (width + height), no scroll.
+      var maxW = el.app.clientWidth - 24;
+      var maxH = window.innerHeight - el.stage.getBoundingClientRect().top - 70;
+      renderer.fitTo(maxW, Math.max(220, maxH));
+    }
   }
   window.addEventListener("resize", resize);
   function loop(now) { if (renderer) renderer.render(now); requestAnimationFrame(loop); }

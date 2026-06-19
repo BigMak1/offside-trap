@@ -330,22 +330,26 @@ canvas#game {
 .squad-row.sq4 b { color: var(--red); }
 .squad-row.keeper b { color: #BB8CFF; }
 
-/* ── desktop: board on the left, controls in a sidebar ───────────────────── */
+/* board scroll container (centres the canvas; scrolls vertically on desktop) */
+.board-wrap { display: flex; justify-content: center; }
+
+/* ── desktop: board on the left (scaled up), controls in a sidebar ────────── */
 @media (min-width: 900px) {
   .app { max-width: 1040px; padding: 18px 18px 30px; }
   #screen-game.active {
     display: grid;
-    grid-template-columns: auto 330px;
+    grid-template-columns: minmax(0, 1fr) 330px;
     grid-auto-rows: min-content;
     gap: 12px 22px;
     align-content: start;
-    justify-content: center;
   }
   #screen-game .topbar { grid-column: 1 / -1; }
-  #screen-game .stage { grid-column: 1; grid-row: 2 / 7; align-self: start; justify-self: center; }
-  #screen-game .hud { grid-column: 2; grid-row: 2; }
+  #screen-game .board-wrap {
+    grid-column: 1; grid-row: 2 / 7; align-items: flex-start;
+    overflow-y: auto; max-height: calc(100vh - 92px);
+  }
+  #screen-game .hud { grid-column: 2; grid-row: 2; flex-wrap: wrap; }
   #screen-game .actbar { grid-column: 2; grid-row: 3; }
   #screen-game .controls { grid-column: 2; grid-row: 4; justify-content: flex-start; }
   #screen-game .hint { grid-column: 2; grid-row: 5; margin: 0; text-align: left; max-width: none; }
-  #screen-game .hud { flex-wrap: wrap; }
 }

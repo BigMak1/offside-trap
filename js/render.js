@@ -70,6 +70,14 @@
     return this.scale;
   };
 
+  // Force an exact integer scale (desktop: scale by column width, scroll the panel vertically).
+  Renderer.prototype.setScale = function (s) {
+    this.scale = Math.max(1, s | 0);
+    this.canvas.style.width = this.W * this.scale + "px";
+    this.canvas.style.height = this.H * this.scale + "px";
+    return this.scale;
+  };
+
   Renderer.prototype.cellRect = function (idx) {
     var cols = this.cfg.cols;
     return { x: (idx % cols) * TILE, y: GOAL_BAND + Math.floor(idx / cols) * TILE };

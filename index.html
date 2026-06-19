@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
@@ -20,41 +20,42 @@
         <h1 class="logo">OFFSIDE<span>TRAP</span></h1>
       </div>
       <nav class="menu">
-        <button class="px-btn px-btn--big" data-act="play">► ИГРАТЬ</button>
-        <button class="px-btn" data-act="difficulty">СЛОЖНОСТЬ</button>
-        <button class="px-btn" data-act="rules">ПРАВИЛА</button>
+        <button class="px-btn px-btn--big" data-act="play" data-i18n="menu_play">▶ PLAY</button>
+        <button class="px-btn" data-act="difficulty" data-i18n="menu_difficulty">DIFFICULTY</button>
+        <button class="px-btn" data-act="rules" data-i18n="menu_guide">DOSSIER</button>
+        <button class="px-btn px-btn--ghost lang-toggle" data-act="lang" title="Language">RU</button>
       </nav>
-      <p class="tagline">ежедневный челлендж · футбольный сапёр</p>
+      <p class="tagline" data-i18n="tagline">daily challenge · football minesweeper</p>
     </section>
 
     <!-- ════════ DIFFICULTY ════════ -->
     <section class="screen" id="screen-difficulty">
-      <h2 class="screen-title">СЛОЖНОСТЬ</h2>
+      <h2 class="screen-title" data-i18n="diff_title">DIFFICULTY</h2>
       <div class="cards" id="diff-cards"><!-- built from CONFIG.presets --></div>
-      <button class="px-btn px-btn--ghost" data-act="to-title">◄ НАЗАД</button>
+      <button class="px-btn px-btn--ghost" data-act="to-title" data-i18n="back">◄ BACK</button>
     </section>
 
     <!-- ════════ GAME ════════ -->
     <section class="screen" id="screen-game">
       <header class="topbar">
-        <button class="px-btn px-btn--icon" data-act="to-title" title="В меню">☰</button>
+        <button class="px-btn px-btn--icon" data-act="to-title" data-i18n-title="to_menu_title" title="Menu">☰</button>
         <h1 class="logo logo--sm">OFFSIDE<span>TRAP</span></h1>
-        <div class="seed">доска <strong id="seed-val">—</strong></div>
+        <div class="seed"><span data-i18n="board_label">board</span> <strong id="seed-val">—</strong></div>
       </header>
 
       <div class="hud">
-        <div class="stat" title="Навык">
+        <div class="stat" data-i18n-title="hud_skill" title="Skill">
           <img class="stat-ico" src="assets/icon-skill.png" alt="skill" />
           <span class="stat-num" id="skill-val">1</span>
         </div>
-        <div class="stat stat--wide" title="Стамина">
+        <div class="stat stat--wide" data-i18n-title="hud_stamina" title="Stamina">
           <img class="stat-ico" src="assets/icon-stamina.png" alt="stamina" />
           <div class="bars">
             <span class="stat-num" id="stamina-val">5 / 5</span>
             <div class="bar"><i id="stamina-bar" class="fill fill--stamina"></i></div>
           </div>
         </div>
-        <div class="stat stat--wide" title="Уровень / XP">
+        <div class="stat stat--wide" data-i18n-title="hud_level" title="Level / XP">
           <span class="stat-label">LVL <span class="stat-num" id="level-val">0</span></span>
           <div class="bar"><i id="xp-bar" class="fill fill--xp"></i></div>
         </div>
@@ -62,7 +63,7 @@
 
       <div class="actbar">
         <div class="scout" id="scout"><!-- team sheet, built in JS --></div>
-        <button class="px-btn px-btn--level" id="btn-level" disabled>+ УРОВЕНЬ</button>
+        <button class="px-btn px-btn--level" id="btn-level" data-i18n="btn_level" disabled>+ LEVEL UP</button>
       </div>
 
       <div class="stage" id="stage">
@@ -73,33 +74,39 @@
             <div class="banner-title" id="banner-title">GOAL!</div>
             <div class="banner-sub" id="banner-sub"></div>
             <div class="banner-actions">
-              <button class="px-btn" id="banner-again">↻ СНОВА</button>
-              <button class="px-btn px-btn--ghost" data-act="to-title">☰ МЕНЮ</button>
+              <button class="px-btn" id="banner-again" data-i18n="banner_again">↻ AGAIN</button>
+              <button class="px-btn px-btn--ghost" data-act="to-title" data-i18n="banner_menu">☰ MENU</button>
             </div>
           </div>
         </div>
       </div>
 
       <div class="controls">
-        <button class="px-btn" id="btn-mark" aria-pressed="false" title="Поставить конус">🚩 МАРКЕР</button>
-        <button class="px-btn" id="btn-replay" title="Переиграть доску">↻ ЗАНОВО</button>
-        <button class="px-btn" data-act="rules" title="Правила">? ПРАВИЛА</button>
-        <button class="px-btn" id="btn-crt" aria-pressed="false" title="CRT-оверлей">📺 CRT</button>
-        <button class="px-btn" id="btn-debug" aria-pressed="false" title="Показать доску">👁 DEBUG</button>
+        <button class="px-btn" id="btn-mark" aria-pressed="false" data-i18n="ctrl_mark" title="Cone">🚩 CONE</button>
+        <button class="px-btn" id="btn-replay" data-i18n="ctrl_replay" title="Reset board">↻ RESET</button>
+        <button class="px-btn" data-act="rules" data-i18n="ctrl_guide" title="Dossier">? DOSSIER</button>
+        <button class="px-btn" id="btn-crt" aria-pressed="false" data-i18n="ctrl_crt" title="CRT overlay">📺 CRT</button>
+        <button class="px-btn" id="btn-debug" aria-pressed="false" data-i18n="ctrl_debug" title="Reveal board">👁 DEBUG</button>
+        <button class="px-btn px-btn--ghost lang-toggle" data-act="lang" title="Language">RU</button>
       </div>
 
-      <p class="hint" id="hint">
-        Веди мяч к воротам наверху, вскрывая соседние клетки. Число — сумма рейтингов
-        защитников вокруг. Долгий тап / правый клик ставит конус.
+      <p class="hint" id="hint" data-i18n="hint">
+        Dribble the ball up to the goal, opening cells next to it. A number is the sum of the
+        surrounding defenders' power. Long-press / right-click drops a cone.
       </p>
     </section>
 
-    <!-- ════════ RULES OVERLAY ════════ -->
+    <!-- ════════ DOSSIER / GUIDE OVERLAY ════════ -->
     <div class="overlay" id="overlay-rules">
       <div class="overlay-box">
-        <h2 class="screen-title">КАК ИГРАТЬ</h2>
+        <h2 class="screen-title" data-i18n="guide_title">DOSSIER</h2>
+        <div class="guide-tabs" id="guide-tabs">
+          <button class="guide-tab active" data-tab="rules" data-i18n="guide_tab_rules">HOW TO PLAY</button>
+          <button class="guide-tab" data-tab="squad" data-i18n="guide_tab_squad">THE OPPOSITION</button>
+        </div>
         <ul class="rules" id="rules-list"><!-- built in JS with sprite icons --></ul>
-        <button class="px-btn px-btn--big" data-act="close-rules">ПОНЯТНО ►</button>
+        <div class="squad" id="squad-list" hidden><!-- built in JS --></div>
+        <button class="px-btn px-btn--big" data-act="close-rules" data-i18n="guide_ok">GOT IT ▶</button>
       </div>
     </div>
 
@@ -107,6 +114,7 @@
 
   <script src="js/config.js"></script>
   <script src="js/rng.js"></script>
+  <script src="js/i18n.js"></script>
   <script src="js/game.js"></script>
   <script src="js/render.js"></script>
   <script src="js/main.js"></script>

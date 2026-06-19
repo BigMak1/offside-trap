@@ -3,6 +3,7 @@
   "use strict";
 
   var CFG = window.OT_CONFIG, RNG = window.OT_RNG, GAME = window.OT_GAME, R = window.OT_RENDER;
+  var I = window.OT_I18N, t = I.t;
 
   var params = new URLSearchParams(location.search);
   var dayOverride = params.get("day");
@@ -19,6 +20,8 @@
     diffCards: document.getElementById("diff-cards"),
     rulesOverlay: document.getElementById("overlay-rules"),
     rulesList: document.getElementById("rules-list"),
+    squadList: document.getElementById("squad-list"),
+    guideTabs: document.getElementById("guide-tabs"),
     canvas: document.getElementById("game"),
     stage: document.getElementById("stage"),
     scout: document.getElementById("scout"),
@@ -42,12 +45,14 @@
 
   var renderer, state, markMode = false;
   var difficulty = "normal", seedKey, activeCfg = CFG.resolve("normal");
+  var lastBanner = null;   // {tk, sk, vars} so an open banner can re-localize on language switch
 
   function showScreen(name) {
     Object.keys(el.screens).forEach(function (k) { el.screens[k].classList.toggle("active", k === name); });
     if (name === "game") requestAnimationFrame(resize);
   }
   function showRules(on) { el.rulesOverlay.classList.toggle("show", on); }
+  function diffLabel(key) { return t("diff_" + key); }
 
   // ── difficulty cards (from CONFIG.presets) ──────────────────────────────────
   function buildDifficultyCards() {
@@ -64,11 +69,10 @@
       var k = document.createElement("img"); k.src = "assets/keeper.png"; k.alt = ""; defs.appendChild(k);
 
       var body = document.createElement("div"); body.className = "card-body";
-      var name = document.createElement("div"); name.className = "card-name " + key; name.textContent = pr.label;
-      if (key === "normal") { var b = document.createElement("span"); b.className = "card-badge"; b.textContent = "ежедневный"; name.appendChild(b); }
+      var name = document.createElement("div"); name.className = "card-name " + key; name.textContent = diffLabel(key);
+      if (key === "normal") { var b = document.createElement("span"); b.className = "card-badge"; b.textContent = t("badge_daily"); name.appendChild(b); }
       var meta = document.createElement("div"); meta.className = "card-meta";
-      meta.textContent = "поле " + pr.cols + "×" + pr.rows + " · " + total + " защитников · вратарь " +
-        pr.keeperPower + " · стамина " + pr.start.stamina;
+      meta.textContent = t("card_meta", { cols: pr.cols, rows: pr.rows, n: total, kp: pr.keeperPower, st: pr.start.stamina });
       body.appendChild(name); body.appendChild(meta);
       card.appendChild(defs); card.appendChild(body);
       card.addEventListener("click", function () { startPractice(key); });
@@ -76,27 +80,54 @@
     });
   }
 
-  // ── rules (illustrated) ─────────────────────────────────────────────────────
+  // ── DOSSIER: rules tab (illustrated) ────────────────────────────────────────
   function buildRules() {
     var rows = [
-      ["ball", "Цель", " — провести мяч к воротам наверху и обыграть вратаря.", ""],
-      ["tile-hidden", "Ход", " — вскрывай клетку рядом с мячом: ведёшь его дриблингом снизу вверх.", ""],
-      ["digit-3", "Число", " — сумма СИЛ защитников в 8 соседних клетках (вратарь тоже считается). 0 раскрывает каскад.", ""],
-      ["defender-2", "Защитник", " — пройти стоит (сила − навык) стамины. Не хватило стамины → потеря владения. За проход +XP.", ""],
-      ["keeper", "Вратарь (босс)", " — стоит у ворот и виден сразу, с его силой. Обыграть его = ГОЛ. Силён — сначала качайся на других.", "win"],
-      ["medkit", "Медкит", " — восстанавливает стамину (передышка на длинном забеге).", ""],
-      ["icon-skill", "Уровень", " — набрал XP → жми «+УРОВЕНЬ»: навык +1, стамина до полной. Лечений мало — выбирай момент.", ""],
-      ["icon-stamina", "Поражение", " — кончилась стамина на проход или не осталось ходов: потеря владения.", "lose"],
+      ["ball", "rule_goal_t", "rule_goal_d", ""],
+      ["tile-hidden", "rule_move_t", "rule_move_d", ""],
+      ["digit-3", "rule_number_t", "rule_number_d", ""],
+      ["defender-2", "rule_def_t", "rule_def_d", ""],
+      ["keeper", "rule_keeper_t", "rule_keeper_d", "win"],
+      ["medkit", "rule_medkit_t", "rule_medkit_d", ""],
+      ["icon-skill", "rule_level_t", "rule_level_d", ""],
+      ["icon-stamina", "rule_lose_t", "rule_lose_d", "lose"],
     ];
     el.rulesList.textContent = "";
     rows.forEach(function (r) {
       var li = document.createElement("li"); if (r[3]) li.className = r[3];
       var img = document.createElement("img"); img.className = "ico"; img.src = "assets/" + r[0] + ".png"; img.alt = "";
       var span = document.createElement("span");
-      var b = document.createElement("b"); b.textContent = r[1];
-      span.appendChild(b); span.appendChild(document.createTextNode(r[2]));
+      var b = document.createElement("b"); b.textContent = t(r[1]);
+      span.appendChild(b); span.appendChild(document.createTextNode(t(r[2])));
       li.appendChild(img); li.appendChild(span); el.rulesList.appendChild(li);
     });
+  }
+
+  // ── DOSSIER: the opposition tab (defender classification + keeper) ──────────
+  function buildSquad() {
+    el.squadList.textContent = "";
+    var intro = document.createElement("p"); intro.className = "squad-intro"; intro.textContent = t("squad_intro");
+    el.squadList.appendChild(intro);
+    function row(sprite, title, sub, cls) {
+      var r = document.createElement("div"); r.className = "squad-row" + (cls ? " " + cls : "");
+      var img = document.createElement("img"); img.src = "assets/" + sprite + ".png"; img.alt = "";
+      var txt = document.createElement("div"); txt.className = "squad-txt";
+      var b = document.createElement("b"); b.textContent = title;
+      var s = document.createElement("span"); s.textContent = sub;
+      txt.appendChild(b); txt.appendChild(s); r.appendChild(img); r.appendChild(txt);
+      el.squadList.appendChild(r);
+    }
+    [1, 2, 3, 4].forEach(function (pw) {
+      row("defender-" + pw, t("squad_def", { p: pw }), t("squad_def_cost"));
+    });
+    row("keeper", t("squad_keeper"), t("squad_keeper_d"), "keeper");
+  }
+
+  function showGuideTab(tab) {
+    var tabs = el.guideTabs.querySelectorAll(".guide-tab");
+    for (var i = 0; i < tabs.length; i++) tabs[i].classList.toggle("active", tabs[i].getAttribute("data-tab") === tab);
+    el.rulesList.hidden = tab !== "rules";
+    el.squadList.hidden = tab !== "squad";
   }
 
   // ── game lifecycle ──────────────────────────────────────────────────────────
@@ -108,8 +139,8 @@
     renderer.showDebug = debugStart;
     renderer.reveals = {}; renderer.particles = [];
     renderer.onEvents(state.initialEvents, performance.now());
-    hideBanner(); updateHUD();
-    el.seed.textContent = seedLabel() + " · " + activeCfg.label;
+    lastBanner = null; hideBanner(); updateHUD();
+    el.seed.textContent = seedLabel() + " · " + diffLabel(difficulty);
     showScreen("game");
   }
   function startDaily() { newGame(diffParam || "normal", RNG.dailyKey(dayOverride)); }
@@ -120,7 +151,7 @@
   function seedLabel() {
     if (seedKey.indexOf("utc:") === 0) return seedKey.slice(4);
     if (seedKey.indexOf("day:") === 0) return "#" + seedKey.slice(4);
-    return "практика";
+    return t("seed_practice");
   }
 
   function updateHUD() {
@@ -144,7 +175,7 @@
     el.btnLevel.disabled = !can;
     el.btnLevel.classList.toggle("ready", can);
     var pend = state.pendingLevels || 0;
-    el.btnLevel.textContent = "+ УРОВЕНЬ" + (pend > 1 ? " (" + pend + ")" : "");
+    el.btnLevel.textContent = t("btn_level") + (pend > 1 ? " (" + pend + ")" : "");
   }
 
   function updateScout() {
@@ -166,8 +197,8 @@
       var n = s.remaining[pw] || 0; if (!n) return;
       var c = document.createElement("div"); c.className = "chip";
       var im = document.createElement("img"); im.src = "assets/defender-" + pw + ".png"; im.alt = "";
-      var t = document.createElement("span"); t.textContent = "×" + n;
-      c.appendChild(im); c.appendChild(t); el.scout.appendChild(c);
+      var tx = document.createElement("span"); tx.textContent = "×" + n;
+      c.appendChild(im); c.appendChild(tx); el.scout.appendChild(c);
     });
   }
 
@@ -188,14 +219,12 @@
       } else if (e.type === "medkit") {
         popup(e.idx, "+" + e.restored, "heal");
       } else if (e.type === "levelup") {
-        popup(state.ballIdx, "НАВЫК +1", "level");
+        popup(state.ballIdx, t("pop_skill"), "level");
       } else if (e.type === "goal") {
-        showBanner("ГОЛ!", "Ты обыграл вратаря ⚽");
+        showBanner("banner_goal_t", "banner_goal_s", {});
       } else if (e.type === "gameover") {
-        var sub = e.reason === "stranded"
-          ? "Тупик: ходов по карману не осталось (стамина " + e.stamina + ")."
-          : "Защитник силы " + e.power + ": на проход нужно " + e.cost + " стамины, было " + e.stamina + ".";
-        showBanner("ПОТЕРЯ ВЛАДЕНИЯ", sub);
+        if (e.reason === "stranded") showBanner("banner_lost_t", "lost_stranded", { st: e.stamina });
+        else showBanner("banner_lost_t", "lost_tackle", { p: e.power, c: e.cost, st: e.stamina });
       }
     });
     updateHUD();
@@ -236,8 +265,10 @@
   el.canvas.addEventListener("contextmenu", function (ev) { ev.preventDefault(); tryMark(renderer.cellAtClient(ev.clientX, ev.clientY)); });
 
   // ── banners ──────────────────────────────────────────────────────────────
-  function showBanner(title, sub) {
-    el.bannerTitle.textContent = title; el.bannerSub.textContent = sub;
+  function showBanner(tk, sk, vars) {
+    lastBanner = { tk: tk, sk: sk, vars: vars || {} };
+    el.bannerTitle.textContent = t(tk, vars);
+    el.bannerSub.textContent = t(sk, vars);
     el.banner.classList.remove("won", "lost");
     el.banner.classList.add("show", state.status === "won" ? "won" : "lost");
   }
@@ -245,14 +276,18 @@
 
   // ── controls + navigation ──────────────────────────────────────────────────
   document.addEventListener("click", function (ev) {
-    var t = ev.target.closest("[data-act]"); if (!t) return;
-    switch (t.getAttribute("data-act")) {
+    var t2 = ev.target.closest("[data-act]"); if (!t2) return;
+    switch (t2.getAttribute("data-act")) {
       case "play": startDaily(); break;
       case "difficulty": showScreen("difficulty"); break;
-      case "rules": showRules(true); break;
+      case "rules": showGuideTab("rules"); showRules(true); break;
       case "close-rules": showRules(false); break;
       case "to-title": hideBanner(); showScreen("title"); break;
+      case "lang": I.toggle(); break;
     }
+  });
+  el.guideTabs.addEventListener("click", function (ev) {
+    var tb = ev.target.closest(".guide-tab"); if (tb) showGuideTab(tb.getAttribute("data-tab"));
   });
   el.btnLevel.addEventListener("click", function () { if (GAME.canLevelUp(state)) reactToEvents(GAME.levelUp(state)); });
   el.btnMark.addEventListener("click", function () { markMode = !markMode; el.btnMark.classList.toggle("active", markMode); el.btnMark.setAttribute("aria-pressed", markMode); });
@@ -260,6 +295,20 @@
   el.btnDebug.addEventListener("click", function () { renderer.showDebug = !renderer.showDebug; el.btnDebug.classList.toggle("active", renderer.showDebug); el.btnDebug.setAttribute("aria-pressed", renderer.showDebug); });
   el.btnReplay.addEventListener("click", function () { newGame(difficulty, seedKey); });
   el.bannerAgain.addEventListener("click", function () { newGame(difficulty, seedKey); });
+
+  // ── i18n: re-render dynamic strings when the language changes ────────────────
+  function relocalize() {
+    buildDifficultyCards(); buildRules(); buildSquad();
+    if (state) {
+      updateHUD();
+      el.seed.textContent = seedLabel() + " · " + diffLabel(difficulty);
+      if (lastBanner && el.banner.classList.contains("show")) {
+        el.bannerTitle.textContent = t(lastBanner.tk, lastBanner.vars);
+        el.bannerSub.textContent = t(lastBanner.sk, lastBanner.vars);
+      }
+    }
+  }
+  I.onChange = relocalize;
 
   // ── layout + loop ────────────────────────────────────────────────────────
   function resize() {
@@ -281,12 +330,12 @@
 
   R.loadSprites("assets/").then(function (sprites) {
     renderer = new R.Renderer(el.canvas, sprites, activeCfg);
-    buildDifficultyCards(); buildRules();
+    I.apply(); buildDifficultyCards(); buildRules(); buildSquad(); showGuideTab("rules");
     if (debugStart) el.btnDebug.classList.add("active");
     requestAnimationFrame(loop);
     if (debugStart || diffParam || dayOverride) startDaily(); else showScreen("title");
   }).catch(function (err) {
     var p = document.createElement("p"); p.style.cssText = "color:#E5484D;padding:1rem;font-family:monospace";
-    p.textContent = "Не удалось загрузить спрайты: " + err.message; document.body.appendChild(p);
+    p.textContent = t("err_sprites", { msg: err.message }); document.body.appendChild(p);
   });
 })();

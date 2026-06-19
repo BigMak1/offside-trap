@@ -143,22 +143,35 @@
   Renderer.prototype.drawNumber = function (n, bx, by, opts) {
     opts = opts || {};
     var ctx = this.ctx, s = "" + n;
-    var w = s.length * NUM_W + (s.length - 1) * NUM_GAP;
+    var gw = opts.small ? 7 : NUM_W, gh = opts.small ? 9 : NUM_H, gap = opts.small ? 1 : NUM_GAP;
+    var w = s.length * gw + (s.length - 1) * gap;
     var x = Math.round(bx + (TILE - w) / 2);
     var y = opts.anchor === "bottom"
-      ? by + TILE - NUM_H - 1
-      : Math.round(by + (TILE - NUM_H) / 2) + (opts.dy || 0);
+      ? by + TILE - gh - 1
+      : Math.round(by + (TILE - gh) / 2) + (opts.dy || 0);
     var backing = opts.backing;
     if (backing) {
       ctx.globalAlpha = backing === true ? 0.5 : 0.85;
       ctx.fillStyle = backing === true ? PAL.ink : backing;
-      ctx.fillRect(x - 1, y - 1, w + 2, NUM_H + 2);
+      ctx.fillRect(x - 1, y - 1, w + 2, gh + 2);
       ctx.globalAlpha = 1;
     }
     for (var i = 0; i < s.length; i++) {
-      this.drawSprite("num-" + s[i], x, y, NUM_W, NUM_H);
-      x += NUM_W + NUM_GAP;
+      this.drawSprite("num-" + s[i], x, y, gw, gh);
+      x += gw + gap;
     }
+  };
+
+  // Draw an opponent (defender/keeper): the figure sits in the UPPER part of the cell with
+  // margin, and the HP number is a small badge BELOW it — Dragonsweeper-style, no overlap.
+  Renderer.prototype.drawToken = function (spriteName, power, r, alpha, numColor) {
+    var ctx = this.ctx;
+    var size = Math.round(TILE * 0.6);                       // figure ~60% of the cell
+    var x = r.x + Math.round((TILE - size) / 2), y = r.y;    // top-centred
+    if (alpha != null) ctx.globalAlpha = alpha;
+    this.drawSprite(spriteName, x, y, size, size);
+    if (alpha != null) ctx.globalAlpha = 1;
+    this.drawNumber(power, r.x, r.y, { backing: numColor || true, anchor: "bottom", small: true });
   };
 
   // Revealed grass alternates light/dark by column → mown pitch stripes.
@@ -179,10 +192,9 @@
     if (cell.kind === "keeper") {
       if (!cell.beaten) {
         this.drawSprite("tile-hidden", r.x, r.y, TILE, TILE);
-        this.drawSprite("keeper", r.x, r.y, TILE, TILE);
         var cost = cell.power - p.skill;
         var affordable = cost <= p.stamina;        // cost is >=0 here in practice
-        this.drawNumber(cell.power, r.x, r.y, { backing: affordable ? PAL.green : PAL.red, anchor: "bottom" });
+        this.drawToken("keeper", cell.power, r, null, affordable ? PAL.green : PAL.red);
       } else {
         this.drawSprite(this.grassName(idx), r.x, r.y, TILE, TILE);
         ctx.globalAlpha = 0.3; this.drawSprite("keeper", r.x, r.y, TILE, TILE); ctx.globalAlpha = 1;
@@ -198,10 +210,7 @@
       this.drawSprite("tile-hidden", r.x, r.y, TILE, TILE);
       if (cell.marked) this.drawSprite("marker-cone", r.x, r.y, TILE, TILE);
       if (field && (this.showDebug || this.revealAll)) {
-        if (this.revealAll && !this.showDebug) ctx.globalAlpha = 0.6;
-        this.drawSprite("defender-" + cell.power, r.x, r.y, TILE, TILE);
-        ctx.globalAlpha = 1;
-        this.drawNumber(cell.power, r.x, r.y, { backing: true, anchor: "bottom" });   // HP cost badge
+        this.drawToken("defender-" + cell.power, cell.power, r, (this.revealAll && !this.showDebug) ? 0.6 : null, true);
       }
       return;
     }
@@ -218,10 +227,9 @@
 
     this.drawSprite(this.grassName(idx), r.x, r.y, TILE, TILE);
     if (cell.lost) {
-      this.drawSprite("defender-" + (cell.power || 1), r.x, r.y, TILE, TILE);
+      this.drawToken("defender-" + (cell.power || 1), cell.power || 1, r, null, PAL.red);
     } else if (field && cell.beaten) {
-      ctx.globalAlpha = 0.62; this.drawSprite("defender-" + cell.power, r.x, r.y, TILE, TILE); ctx.globalAlpha = 1;
-      this.drawNumber(cell.power, r.x, r.y, { backing: true, anchor: "bottom" });     // beaten: whom you got past
+      this.drawToken("defender-" + cell.power, cell.power, r, 0.62, true);     // beaten: whom you got past
     } else if (cell.kind === "medkit") {
       ctx.globalAlpha = 0.45; this.drawSprite("medkit", r.x, r.y, TILE, TILE); ctx.globalAlpha = 1;
     } else if (cell.pressure > 0) {

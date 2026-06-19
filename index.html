@@ -5,58 +5,98 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#0B1322" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%230B1322'/><circle cx='8' cy='8' r='5' fill='%23F3F1E2'/></svg>" />
-  <title>Offside Trap</title>
+  <link rel="stylesheet" href="assets/font/pixelify.css" />
   <link rel="stylesheet" href="styles.css" />
+  <title>Offside Trap</title>
 </head>
 <body>
-  <div class="app">
-    <header class="topbar">
-      <h1 class="logo">OFFSIDE<span>TRAP</span></h1>
-      <div class="seed">доска <strong id="seed-val">—</strong></div>
-    </header>
+  <div class="app" id="app">
 
-    <div class="hud">
-      <div class="stat" title="Навык (skill)">
-        <img class="stat-ico" src="assets/icon-skill.png" alt="skill" />
-        <span class="stat-num" id="skill-val">1</span>
+    <!-- ════════ TITLE ════════ -->
+    <section class="screen active" id="screen-title">
+      <div class="title-banner">
+        <img class="banner-img" src="assets/bg-stadium.png" alt="" />
+        <h1 class="logo">OFFSIDE<span>TRAP</span></h1>
       </div>
-      <div class="stat stat-wide" title="Стамина (stamina)">
-        <img class="stat-ico" src="assets/icon-stamina.png" alt="stamina" />
-        <div class="bars">
-          <span class="stat-num" id="stamina-val">5 / 5</span>
-          <div class="bar"><i id="stamina-bar" class="fill stamina"></i></div>
+      <nav class="menu">
+        <button class="px-btn px-btn--big" data-act="play">► ИГРАТЬ</button>
+        <button class="px-btn" data-act="difficulty">СЛОЖНОСТЬ</button>
+        <button class="px-btn" data-act="rules">ПРАВИЛА</button>
+      </nav>
+      <p class="tagline">ежедневный челлендж · футбольный сапёр</p>
+    </section>
+
+    <!-- ════════ DIFFICULTY ════════ -->
+    <section class="screen" id="screen-difficulty">
+      <h2 class="screen-title">СЛОЖНОСТЬ</h2>
+      <div class="cards" id="diff-cards"><!-- built from CONFIG.presets --></div>
+      <button class="px-btn px-btn--ghost" data-act="to-title">◄ НАЗАД</button>
+    </section>
+
+    <!-- ════════ GAME ════════ -->
+    <section class="screen" id="screen-game">
+      <header class="topbar">
+        <button class="px-btn px-btn--icon" data-act="to-title" title="В меню">☰</button>
+        <h1 class="logo logo--sm">OFFSIDE<span>TRAP</span></h1>
+        <div class="seed">доска <strong id="seed-val">—</strong></div>
+      </header>
+
+      <div class="hud">
+        <div class="stat" title="Навык">
+          <img class="stat-ico" src="assets/icon-skill.png" alt="skill" />
+          <span class="stat-num" id="skill-val">1</span>
+        </div>
+        <div class="stat stat--wide" title="Стамина">
+          <img class="stat-ico" src="assets/icon-stamina.png" alt="stamina" />
+          <div class="bars">
+            <span class="stat-num" id="stamina-val">5 / 5</span>
+            <div class="bar"><i id="stamina-bar" class="fill fill--stamina"></i></div>
+          </div>
+        </div>
+        <div class="stat stat--wide" title="Уровень / XP">
+          <span class="stat-label">LVL <span class="stat-num" id="level-val">0</span></span>
+          <div class="bar"><i id="xp-bar" class="fill fill--xp"></i></div>
         </div>
       </div>
-      <div class="stat stat-wide" title="Уровень / XP">
-        <span class="stat-label">LVL <span class="stat-num" id="level-val">0</span></span>
-        <div class="bar"><i id="xp-bar" class="fill xp"></i></div>
-      </div>
-    </div>
 
-    <div class="stage" id="stage">
-      <canvas id="game"></canvas>
-      <div class="pop-layer" id="pop-layer"></div>
-      <div class="banner" id="banner">
-        <div class="banner-box">
-          <div class="banner-title" id="banner-title">GOAL!</div>
-          <div class="banner-sub" id="banner-sub"></div>
-          <button class="btn primary" id="banner-again">Сыграть снова</button>
+      <div class="stage" id="stage">
+        <canvas id="game"></canvas>
+        <div class="pop-layer" id="pop-layer"></div>
+        <div class="banner" id="banner">
+          <div class="banner-box">
+            <div class="banner-title" id="banner-title">GOAL!</div>
+            <div class="banner-sub" id="banner-sub"></div>
+            <div class="banner-actions">
+              <button class="px-btn" id="banner-again">↻ СНОВА</button>
+              <button class="px-btn px-btn--ghost" data-act="to-title">☰ МЕНЮ</button>
+            </div>
+          </div>
         </div>
       </div>
+
+      <div class="controls">
+        <button class="px-btn" id="btn-mark" aria-pressed="false" title="Поставить конус">🚩 МАРКЕР</button>
+        <button class="px-btn" id="btn-replay" title="Переиграть доску">↻ ЗАНОВО</button>
+        <button class="px-btn" data-act="rules" title="Правила">? ПРАВИЛА</button>
+        <button class="px-btn" id="btn-crt" aria-pressed="false" title="CRT-оверлей">📺 CRT</button>
+        <button class="px-btn" id="btn-debug" aria-pressed="false" title="Показать доску">👁 DEBUG</button>
+      </div>
+
+      <p class="hint" id="hint">
+        Веди мяч к воротам наверху, вскрывая соседние клетки. Число — сумма рейтингов
+        защитников вокруг. Долгий тап / правый клик ставит конус.
+      </p>
+    </section>
+
+    <!-- ════════ RULES OVERLAY ════════ -->
+    <div class="overlay" id="overlay-rules">
+      <div class="overlay-box">
+        <h2 class="screen-title">КАК ИГРАТЬ</h2>
+        <ul class="rules" id="rules-list"><!-- built in JS with sprite icons --></ul>
+        <button class="px-btn px-btn--big" data-act="close-rules">ПОНЯТНО ►</button>
+      </div>
     </div>
 
-    <div class="controls">
-      <button class="btn" id="btn-mark" aria-pressed="false" title="Режим маркера: ставит конус на подозрительную клетку">🚩 Маркер</button>
-      <button class="btn" id="btn-replay" title="Переиграть текущую доску">↻ Заново</button>
-      <button class="btn" id="btn-practice" title="Случайная тренировочная доска">🎲 Практика</button>
-      <button class="btn" id="btn-crt" aria-pressed="false" title="CRT / scanline-оверлей">📺 CRT</button>
-      <button class="btn" id="btn-debug" aria-pressed="false" title="Показать всю доску (отладка)">👁 Debug</button>
-    </div>
-
-    <p class="hint">
-      Тапни клетку рядом с мячом, чтобы вести его к воротам наверху. Число — сумма рейтингов
-      защитников вокруг. Долгий тап / правый клик — поставить конус.
-    </p>
   </div>
 
   <script src="js/config.js"></script>

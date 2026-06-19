@@ -35,18 +35,9 @@
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
     this.sprites = sprites;
-    this.cfg = cfg;
-    this.W = cfg.cols * TILE;
-    this.H = cfg.rows * TILE + GOAL_BAND;
-    canvas.width = this.W;
-    canvas.height = this.H;
-    this.ctx.imageSmoothingEnabled = false;
-
-    this.state = null;
     this.scale = 1;
     this.hover = -1;
     this.showDebug = false;
-
     this.reveals = {};        // idx -> {start, dur}
     this.particles = [];
     this.flash = 0;           // global white flash alpha source time
@@ -54,7 +45,19 @@
     this.shakeUntil = 0;
     this.ballPos = null;      // {x, y} logical px
     this.now = 0;
+    this.state = null;
+    this.configure(cfg);
   }
+
+  // (Re)size the logical canvas for the active board (board size is preset-driven).
+  Renderer.prototype.configure = function (cfg) {
+    this.cfg = cfg;
+    this.W = cfg.cols * TILE;
+    this.H = cfg.rows * TILE + GOAL_BAND;
+    this.canvas.width = this.W;
+    this.canvas.height = this.H;
+    this.ctx.imageSmoothingEnabled = false;
+  };
 
   Renderer.prototype.setState = function (state) {
     this.state = state;

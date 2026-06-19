@@ -271,3 +271,32 @@ canvas#game {
   margin: 4px auto 0; max-width: 460px; text-align: center;
   font-size: 12px; line-height: 1.6; color: var(--grey);
 }
+
+/* ── action bar: scouting (team sheet) + level-up ─────────────────────────── */
+.actbar { display: flex; gap: 8px; align-items: stretch; }
+.scout {
+  flex: 1; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  padding: 6px 8px; background: var(--navy);
+  border: 3px solid var(--ink);
+  box-shadow: inset 2px 2px 0 0 var(--steel), inset -2px -2px 0 0 #0a1120;
+}
+.chip {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 5px; background: var(--steel); border: 2px solid var(--ink);
+  font-size: 13px; font-weight: 700; color: var(--white);
+}
+.chip img { width: 18px; height: 18px; }
+.chip--keeper.ok { background: #1c5c34; border-color: var(--grass3); }
+.chip--keeper.danger { background: #5a1f22; border-color: var(--red); color: var(--white); }
+.chip--keeper.beaten { background: var(--ink); color: var(--grass3); }
+
+.px-btn--level { min-width: 120px; font-size: 13px; }
+.px-btn--level:disabled { opacity: 0.5; cursor: default; filter: grayscale(0.4); box-shadow: 4px 4px 0 0 var(--ink); }
+.px-btn--level.ready {
+  background: var(--gold); color: var(--ink);
+  box-shadow: inset 2px 2px 0 0 #fff2a8, inset -2px -2px 0 0 var(--orange), 4px 4px 0 0 var(--ink);
+  animation: levelpulse 0.7s steps(2) infinite;
+}
+@keyframes levelpulse { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.18); } }
+
+.popup.heal { color: var(--grass3); }

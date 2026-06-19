@@ -1,4 +1,4 @@
-// Plain Node test runner (no framework) for the pure game logic.
+// Plain Node test runner (no framework) for the pure game logic (Stage 4: Dragonsweeper football).
 "use strict";
 const assert = require("assert");
 const path = require("path");
@@ -6,260 +6,635 @@ const CONFIG = require(path.join("..", "js", "config.js"));
 const RNG = require(path.join("..", "js", "rng.js"));
 const G = require(path.join("..", "js", "game.js"));
 
-// Resolve presets into flat cfg objects (CONFIG is now preset-driven, not flat).
-const NORMAL = CONFIG.resolve("normal");
+// Resolve presets into flat cfg objects (CONFIG is preset-driven, not flat).
 const EASY = CONFIG.resolve("easy");
+const NORMAL = CONFIG.resolve("normal");
 const HARD = CONFIG.resolve("hard");
 
 let passed = 0;
 function test(name, fn) {
   try { fn(); passed++; console.log("  ok  " + name); }
-  catch (e) { console.error("FAIL  " + name + "\n      " + e.message); process.exitCode = 1; }
+  catch (e) { console.error("FAIL  " + name + "\n      " + (e.stack || e.message)); process.exitCode = 1; }
 }
 
-function countDefenders(board) {
-  const c = { 1: 0, 2: 0, 3: 0, total: 0 };
-  board.cells.forEach((cell) => { if (cell.def > 0) { c[cell.def]++; c.total++; } });
+// Count UNBEATEN field defenders by power (keeper excluded).
+function countFieldDefenders(board) {
+  const c = { 1: 0, 2: 0, 3: 0, 4: 0, total: 0 };
+  board.cells.forEach((cell) => {
+    if (cell.kind === "field" && cell.power > 0) { c[cell.power]++; c.total++; }
+  });
   return c;
+}
+function countMedkits(board) {
+  return board.cells.filter((c) => c.kind === "medkit").length;
 }
 
 // ── config / presets ──────────────────────────────────────────────────────────
 test("resolve flattens a preset into the keys game logic reads", () => {
   const cfg = CONFIG.resolve("normal");
   assert.strictEqual(cfg.difficulty, "normal");
-  assert.strictEqual(cfg.cols, 10);
-  assert.strictEqual(cfg.rows, 8);
+  assert.strictEqual(cfg.cols, 8);
+  assert.strictEqual(cfg.rows, 12);
   assert.strictEqual(cfg.goalRow, 0);
-  assert.strictEqual(cfg.startRow, 7);          // rows - 1
-  assert.strictEqual(cfg.startCol, 5);          // floor(cols / 2)
+  assert.strictEqual(cfg.startRow, 11);          // rows - 1
+  assert.strictEqual(cfg.startCol, 4);           // floor(cols / 2)
+  assert.strictEqual(cfg.keeperCol, 4);          // floor(cols / 2)
   assert.strictEqual(cfg.tile, 16);
-  assert.strictEqual(cfg.maxGenAttempts, 600);
-  assert.ok(cfg.defenders && cfg.start && cfg.xpThresholds && cfg.offsideRowChoices);
+  assert.strictEqual(cfg.keeperPower, 13);
+  assert.strictEqual(cfg.medkits, 2);
+  assert.strictEqual(cfg.medkitRestore, 3);
   assert.strictEqual(cfg.allowSafePath, false);
-  assert.strictEqual(cfg.levelRefill, 2);       // partial refill carried through resolve()
+  assert.ok(cfg.defenders && cfg.start && cfg.xpThresholds);
 });
 
-test("presets expose the hardcore balance numbers (start stamina, counts, levelRefill)", () => {
-  // Easy: generous start + effectively-full refill.
-  assert.strictEqual(EASY.start.stamina, 6);
+test("presets expose the Stage-4 balance numbers", () => {
+  // Easy: 7x10, generous start, keeper 9, 3 medkits.
+  assert.strictEqual(EASY.cols, 7);
+  assert.strictEqual(EASY.rows, 10);
+  assert.deepStrictEqual(EASY.defenders, { p1: 6, p2: 4, p3: 2, p4: 0 });
+  assert.strictEqual(EASY.keeperPower, 9);
   assert.strictEqual(EASY.start.skill, 1);
-  assert.strictEqual(EASY.levelRefill, 99);
-  assert.deepStrictEqual(EASY.defenders, { r1: 5, r2: 3, r3: 1 });
-  // Normal: tight start, partial refill, wall-sized rating>=2 pool (r2 + r3 === cols).
-  assert.strictEqual(NORMAL.start.stamina, 3);
-  assert.strictEqual(NORMAL.levelRefill, 2);
-  assert.deepStrictEqual(NORMAL.defenders, { r1: 4, r2: 7, r3: 3 });
-  assert.strictEqual(NORMAL.defenders.r2 + NORMAL.defenders.r3, NORMAL.cols); // 7 + 3 === 10
-  // Hard: tightest start, smallest refill, rating>=2 pool >= cols.
-  assert.strictEqual(HARD.start.stamina, 2);
-  assert.strictEqual(HARD.levelRefill, 1);
-  assert.deepStrictEqual(HARD.defenders, { r1: 4, r2: 9, r3: 5 });
-  assert.ok(HARD.defenders.r2 + HARD.defenders.r3 >= HARD.cols); // 9 + 5 >= 11
+  assert.strictEqual(EASY.start.stamina, 7);
+  assert.strictEqual(EASY.medkits, 3);
+  assert.deepStrictEqual(EASY.xpThresholds, [4, 9, 15, 22, 30]);
+  // Normal: 8x12, keeper 13, 2 medkits.
+  assert.strictEqual(NORMAL.cols, 8);
+  assert.strictEqual(NORMAL.rows, 12);
+  assert.deepStrictEqual(NORMAL.defenders, { p1: 8, p2: 6, p3: 4, p4: 2 });
+  assert.strictEqual(NORMAL.keeperPower, 13);
+  assert.strictEqual(NORMAL.start.stamina, 6);
+  assert.strictEqual(NORMAL.medkits, 2);
+  assert.deepStrictEqual(NORMAL.xpThresholds, [4, 9, 15, 22, 30, 40, 52]);
+  // Hard: 8x14, keeper 17, 1 medkit.
+  assert.strictEqual(HARD.cols, 8);
+  assert.strictEqual(HARD.rows, 14);
+  assert.deepStrictEqual(HARD.defenders, { p1: 9, p2: 8, p3: 6, p4: 3 });
+  assert.strictEqual(HARD.keeperPower, 17);
+  assert.strictEqual(HARD.start.stamina, 5);
+  assert.strictEqual(HARD.medkits, 1);
+  assert.deepStrictEqual(HARD.xpThresholds, [5, 11, 18, 26, 35, 45, 57]);
 });
 
 test("resolve falls back to normal for unknown / missing keys", () => {
   const a = CONFIG.resolve("does-not-exist");
-  assert.strictEqual(a.cols, 10);               // normal's board
+  assert.strictEqual(a.difficulty, "normal");
+  assert.strictEqual(a.cols, 8);
   const b = CONFIG.resolve();
   assert.strictEqual(b.difficulty, "normal");
-  assert.strictEqual(b.cols, 10);
+  assert.strictEqual(b.cols, 8);
 });
 
 // ── generation ──────────────────────────────────────────────────────────────
-test("board has exactly the configured squad", () => {
-  const b = G.generateBoard("day:1", NORMAL);
-  const c = countDefenders(b);
-  assert.strictEqual(c[1], NORMAL.defenders.r1);
-  assert.strictEqual(c[2], NORMAL.defenders.r2);
-  assert.strictEqual(c[3], NORMAL.defenders.r3);
-  assert.strictEqual(c.total, 14);
+test("keeper is placed at the goal (row 0, keeperCol), revealed from start, correct power", () => {
+  [EASY, NORMAL, HARD].forEach((cfg) => {
+    const b = G.generateBoard("day:1", cfg);
+    const keeperIdx = G.index(cfg.goalRow, cfg.keeperCol, cfg.cols);
+    assert.strictEqual(b.keeperIdx, keeperIdx, cfg.difficulty + " keeperIdx");
+    const k = b.cells[keeperIdx];
+    assert.strictEqual(k.kind, "keeper", cfg.difficulty + " kind");
+    assert.strictEqual(k.power, cfg.keeperPower, cfg.difficulty + " power");
+    assert.strictEqual(k.revealed, true, cfg.difficulty + " keeper revealed from start");
+    assert.strictEqual(k.beaten, false, cfg.difficulty + " keeper not beaten yet");
+    assert.strictEqual(G.rowOf(keeperIdx, cfg.cols), 0, cfg.difficulty + " keeper at goal row");
+  });
 });
 
-test("start cell is always safe", () => {
-  for (let d = 1; d <= 30; d++) {
-    const b = G.generateBoard("day:" + d, NORMAL);
-    assert.strictEqual(b.cells[b.startIdx].def, 0, "day " + d);
-  }
+test("board has exactly the configured field-defender squad per power", () => {
+  [EASY, NORMAL, HARD].forEach((cfg) => {
+    const b = G.generateBoard("day:2", cfg);
+    const c = countFieldDefenders(b);
+    assert.strictEqual(c[1], cfg.defenders.p1, cfg.difficulty + " p1");
+    assert.strictEqual(c[2], cfg.defenders.p2, cfg.difficulty + " p2");
+    assert.strictEqual(c[3], cfg.defenders.p3, cfg.difficulty + " p3");
+    assert.strictEqual(c[4], cfg.defenders.p4, cfg.difficulty + " p4");
+    const expected = cfg.defenders.p1 + cfg.defenders.p2 + cfg.defenders.p3 + cfg.defenders.p4;
+    assert.strictEqual(c.total, expected, cfg.difficulty + " total field defenders");
+  });
 });
 
-test("every generated board is winnable (Normal)", () => {
-  for (let d = 1; d <= 60; d++) {
-    const b = G.generateBoard("day:" + d, NORMAL);
-    assert.ok(G.isWinnable(b, NORMAL), "day " + d + " not winnable");
-  }
+test("board places the configured number of medkits on safe cells (not start/keeper)", () => {
+  [EASY, NORMAL, HARD].forEach((cfg) => {
+    const b = G.generateBoard("day:3", cfg);
+    assert.strictEqual(countMedkits(b), cfg.medkits, cfg.difficulty + " medkit count");
+    b.cells.forEach((cell, i) => {
+      if (cell.kind === "medkit") {
+        assert.strictEqual(cell.power, 0, cfg.difficulty + " medkit power 0");
+        assert.notStrictEqual(i, b.startIdx, cfg.difficulty + " medkit not on start");
+        assert.notStrictEqual(i, b.keeperIdx, cfg.difficulty + " medkit not on keeper");
+      }
+    });
+  });
+});
+
+test("start cell is always safe (not a defender, not the keeper, not a medkit)", () => {
+  [EASY, NORMAL, HARD].forEach((cfg) => {
+    for (let d = 1; d <= 20; d++) {
+      const b = G.generateBoard("day:" + d, cfg);
+      const s = b.cells[b.startIdx];
+      assert.strictEqual(s.power, 0, cfg.difficulty + " day " + d + " start power");
+      assert.strictEqual(s.kind, "field", cfg.difficulty + " day " + d + " start kind");
+    }
+  });
+});
+
+test("pressure equals SUM of adjacent defender powers INCLUDING the keeper", () => {
+  const b = G.generateBoard("day:5", NORMAL);
+  const cols = b.cols;
+  let sawKeeperContribution = false;
+  b.cells.forEach((cell, i) => {
+    const isDefender = (cell.kind === "field" || cell.kind === "keeper") && cell.power > 0;
+    if (isDefender) return; // pressure only meaningful on safe cells
+    let sum = 0;
+    G.neighbors(i, b.rows, cols).forEach((nIdx) => {
+      const nb = b.cells[nIdx];
+      if ((nb.kind === "field" || nb.kind === "keeper") && nb.power > 0) {
+        sum += nb.power;
+        if (nb.kind === "keeper") sawKeeperContribution = true;
+      }
+    });
+    assert.strictEqual(cell.pressure, sum, "cell " + i + " pressure should be sum incl. keeper");
+  });
+  assert.ok(sawKeeperContribution, "keeper should contribute to some neighbour's pressure");
 });
 
 test("generation is deterministic for the same seed key", () => {
   const a = G.generateBoard("day:7", NORMAL);
   const b = G.generateBoard("day:7", NORMAL);
   assert.deepStrictEqual(
-    a.cells.map((c) => c.def),
-    b.cells.map((c) => c.def)
+    a.cells.map((c) => c.power + ":" + c.kind),
+    b.cells.map((c) => c.power + ":" + c.kind)
   );
-  assert.strictEqual(a.offsideRow, b.offsideRow);
+  assert.strictEqual(a.keeperIdx, b.keeperIdx);
   assert.strictEqual(a.attempt, b.attempt);
   assert.strictEqual(a.forcedDuel, b.forcedDuel);
 });
 
-test("pressure equals sum (not count) of neighbour ratings", () => {
-  const b = G.generateBoard("day:3", NORMAL);
-  const cols = b.cols;
-  b.cells.forEach((cell, i) => {
-    if (cell.def > 0) return;
-    let sum = 0;
-    G.neighbors(i, b.rows, cols).forEach((n) => { sum += b.cells[n].def; });
-    assert.strictEqual(cell.pressure, sum, "cell " + i);
-  });
-});
-
-// ── safe-path constraint per difficulty ───────────────────────────────────────
-// OFFSIDE LINE: Normal/Hard place a FULL-WIDTH wall of defenders across `offsideRow`.
-// With king (8-dir) movement a fully-occupied row is an exact 8-connectivity cut, so there
-// is provably NO safe path across it — hasSafePath(board) === false and forcedDuel === true
-// are now guaranteed (not merely attempted), while every board stays winnable.
-test("Normal AND Hard force a duel: no safe path, forcedDuel true, still winnable", () => {
-  [NORMAL, HARD].forEach((cfg) => {
-    for (let d = 1; d <= 30; d++) {
-      const b = G.generateBoard("day:" + d, cfg);
-      assert.ok(b && b.cells, cfg.difficulty + " day " + d + " produced no board");
-      assert.ok(G.isWinnable(b, cfg), cfg.difficulty + " day " + d + " not winnable");
-      assert.strictEqual(G.hasSafePath(b), false,
-        cfg.difficulty + " day " + d + " unexpectedly has a safe path");
-      assert.strictEqual(b.forcedDuel, true,
-        cfg.difficulty + " day " + d + " forcedDuel should be true");
-    }
-  });
-});
-
-test("Normal/Hard offside wall is complete: every column of offsideRow is a defender", () => {
-  [NORMAL, HARD].forEach((cfg) => {
-    for (let d = 1; d <= 30; d++) {
-      const b = G.generateBoard("day:" + d, cfg);
-      for (let c = 0; c < b.cols; c++) {
-        const idx = G.index(b.offsideRow, c, b.cols);
-        assert.ok(b.cells[idx].def > 0,
-          cfg.difficulty + " day " + d + " column " + c + " of offsideRow is not a defender");
-      }
-    }
-  });
-});
-
-test("Normal/Hard offside wall is entirely rating>=2: no free crossing (cheapest cost >=1 at skill 1)", () => {
-  [NORMAL, HARD].forEach((cfg) => {
-    let cheapest = Infinity;
-    for (let d = 1; d <= 40; d++) {
-      const b = G.generateBoard("day:" + d, cfg);
-      let minWallRating = Infinity;
-      for (let c = 0; c < b.cols; c++) {
-        const idx = G.index(b.offsideRow, c, b.cols);
-        const def = b.cells[idx].def;
-        assert.ok(def >= 2,
-          cfg.difficulty + " day " + d + " wall column " + c + " rating " + def + " < 2 (free crossing)");
-        if (def < minWallRating) minWallRating = def;
-      }
-      // Cheapest crossing at skill 1 is max(0, minWallRating - 1) >= 1 since minWallRating >= 2.
-      const cost = Math.max(0, minWallRating - cfg.start.skill);
-      assert.ok(cost >= 1,
-        cfg.difficulty + " day " + d + " cheapest wall crossing cost " + cost + " < 1");
-      if (cost < cheapest) cheapest = cost;
-    }
-    // Report the cheapest observed crossing for the difficulty (always >= 1).
-    assert.ok(cheapest >= 1, cfg.difficulty + " somehow had a free wall crossing");
-  });
-});
-
-test("start cell is never a defender on Normal/Hard (wall guards the start)", () => {
-  [NORMAL, HARD].forEach((cfg) => {
-    for (let d = 1; d <= 30; d++) {
-      const b = G.generateBoard("day:" + d, cfg);
-      assert.strictEqual(b.cells[b.startIdx].def, 0,
-        cfg.difficulty + " day " + d + " start cell is a defender");
-    }
-  });
-});
-
-test("forcedDuel flag always matches !hasSafePath for the chosen board", () => {
+test("forcedDuel is always true (you must beat the keeper to win)", () => {
   [EASY, NORMAL, HARD].forEach((cfg) => {
-    for (let d = 1; d <= 30; d++) {
-      const b = G.generateBoard("day:" + d, cfg);
-      assert.strictEqual(b.forcedDuel, !G.hasSafePath(b),
-        cfg.difficulty + " day " + d + " forcedDuel inconsistent");
-    }
+    const b = G.generateBoard("day:9", cfg);
+    assert.strictEqual(b.forcedDuel, true, cfg.difficulty);
   });
 });
 
-test("Easy boards keep a fully-safe path (allowSafePath) and forcedDuel is false", () => {
+// ── opening move ─────────────────────────────────────────────────────────────
+test("opening move reveals the start cell, is free, and keeper is already revealed", () => {
+  const s = G.createGame("day:5", NORMAL);
+  assert.ok(s.board.cells[s.board.startIdx].revealed, "start revealed");
+  assert.strictEqual(s.player.stamina, NORMAL.start.stamina, "no stamina spent on opening");
+  assert.strictEqual(s.player.maxStamina, NORMAL.maxStaminaStart, "maxStamina from preset");
+  assert.strictEqual(s.status, "playing");
+  assert.ok(s.board.cells[s.board.keeperIdx].revealed, "keeper revealed from start");
+  assert.strictEqual(s.keeperIdx, s.board.keeperIdx);
+});
+
+test("createGame defaults to the daily (normal) preset when no cfg passed", () => {
+  const s = G.createGame("day:5");
+  assert.strictEqual(s.board.cols, 8);
+  assert.strictEqual(s.player.maxStamina, NORMAL.maxStaminaStart);
+});
+
+test("opening move never strands (board starts hidden)", () => {
   for (let d = 1; d <= 30; d++) {
-    const b = G.generateBoard("day:" + d, EASY);
-    assert.ok(G.hasSafePath(b), "easy day " + d + " has no safe path");
-    assert.strictEqual(b.forcedDuel, false, "easy day " + d + " forcedDuel flag wrong");
+    const s = G.createGame("day:" + d, NORMAL);
+    assert.strictEqual(s.status, "playing", "day " + d + " stranded on opening");
   }
 });
 
-test("isSolvable remains an alias of hasSafePath (back-compat)", () => {
-  const b = G.generateBoard("day:5", EASY);
-  assert.strictEqual(G.isSolvable(b), G.hasSafePath(b));
+// ── dribbling adjacency ──────────────────────────────────────────────────────
+test("cannot reveal a non-adjacent cell (dribbling rule)", () => {
+  const s = G.createGame("day:5", NORMAL);
+  // A corner far from the bottom-centre start should be illegal at first (if still hidden).
+  const far = G.index(0, 0, s.board.cols);
+  if (!s.board.cells[far].revealed) {
+    const ev = G.revealCell(s, far, {});
+    assert.ok(ev.some((e) => e.type === "illegal"), "expected illegal move");
+    assert.strictEqual(s.board.cells[far].revealed, false);
+  }
 });
 
-test("every preset generates winnable boards across several seeds", () => {
+test("the keeper is revealed but NOT passable/frontier until beaten", () => {
+  const s = G.createGame("day:5", NORMAL);
+  const k = s.board.keeperIdx;
+  assert.strictEqual(G.isPassable(s.board.cells[k]), false, "keeper not passable while unbeaten");
+  assert.strictEqual(G.isFrontier(s, k), false, "revealed keeper is not a frontier cell");
+});
+
+// ── combat / duels ───────────────────────────────────────────────────────────
+function firstFrontier(s, pred) {
+  for (let i = 0; i < s.board.cells.length; i++) {
+    if (G.isFrontier(s, i) && (!pred || pred(i))) return i;
+  }
+  return -1;
+}
+
+// Force a field defender of the given power on a frontier cell next to the ball.
+function injectDuel(seed, power, cfg) {
+  cfg = cfg || NORMAL;
+  const s = G.createGame(seed, cfg);
+  const target = firstFrontier(s, (i) => i !== s.board.keeperIdx);
+  assert.ok(target >= 0, "no frontier cell found for " + seed);
+  s.board.cells[target].power = power;
+  s.board.cells[target].kind = "field";
+  s.board.cells[target].pressure = 0;
+  return { s, target };
+}
+
+test("duel within skill is free (cost 0) and still grants XP = power", () => {
+  const { s, target } = injectDuel("day:9", 1); // power 1 <= skill 1 => free
+  const beforeStamina = s.player.stamina;
+  const ev = G.revealCell(s, target, {});
+  const duel = ev.find((e) => e.type === "duel");
+  assert.strictEqual(duel.success, true);
+  assert.strictEqual(duel.cost, 0);
+  assert.strictEqual(duel.power, 1);
+  assert.strictEqual(s.player.stamina, beforeStamina); // no stamina spent
+  assert.strictEqual(s.player.xp, 1);
+  assert.ok(s.board.cells[target].beaten);
+});
+
+test("duel above skill costs stamina = power - skill and grants +power XP", () => {
+  const { s, target } = injectDuel("day:9", 3); // power 3 > skill 1 => cost 2
+  const beforeStamina = s.player.stamina;
+  const ev = G.revealCell(s, target, {});
+  const duel = ev.find((e) => e.type === "duel");
+  assert.strictEqual(duel.cost, 3 - NORMAL.start.skill); // 2
+  assert.strictEqual(s.player.stamina, beforeStamina - duel.cost);
+  assert.strictEqual(s.player.xp, 3);
+  assert.ok(!ev.some((e) => e.type === "levelup"), "duels must NOT auto-level");
+});
+
+test("unaffordable tackle (cost > stamina) ends the game with a 'tackle' gameover", () => {
+  const s = G.createGame("day:9", NORMAL);
+  s.player.stamina = 1;
+  s.player.skill = 1;
+  const target = firstFrontier(s, (i) => i !== s.board.keeperIdx);
+  assert.ok(target >= 0, "no frontier cell found");
+  s.board.cells[target].power = 4; s.board.cells[target].kind = "field"; // cost = 3 > 1 stamina
+  s.board.cells[target].pressure = 0;
+  const ev = G.revealCell(s, target, {});
+  const duel = ev.find((e) => e.type === "duel");
+  assert.strictEqual(duel.success, false);
+  const over = ev.find((e) => e.type === "gameover");
+  assert.ok(over, "expected a gameover event");
+  assert.strictEqual(over.reason, "tackle");
+  assert.strictEqual(over.idx, target);
+  assert.strictEqual(over.power, 4);
+  assert.strictEqual(over.cost, 3);
+  assert.strictEqual(over.stamina, 1); // what the player HAD (< cost)
+  assert.strictEqual(s.status, "lost");
+});
+
+test("beating the keeper WINS (goal event, status 'won')", () => {
+  const s = G.createGame("day:5", NORMAL);
+  // Make the keeper reachable + affordable, then tackle it directly.
+  const k = s.board.keeperIdx;
+  s.player.skill = 1; s.player.stamina = 99;
+  // Force a passable beaten defender adjacent to the keeper so touchesRegion() is true.
+  const nb = G.neighbors(k, s.board.rows, s.board.cols).find((j) => j !== s.board.startIdx);
+  s.board.cells[nb].kind = "field"; s.board.cells[nb].power = 1;
+  s.board.cells[nb].revealed = true; s.board.cells[nb].beaten = true;
+  assert.ok(G.touchesRegion ? G.isActable(s, k) : true, "keeper should be actionable");
+  const ev = G.revealCell(s, k, {});
+  const duel = ev.find((e) => e.type === "duel");
+  assert.ok(duel && duel.success, "keeper duel should succeed");
+  assert.strictEqual(duel.power, NORMAL.keeperPower);
+  assert.ok(ev.some((e) => e.type === "goal" && e.idx === k), "goal event on keeper beaten");
+  assert.strictEqual(s.status, "won");
+  assert.ok(s.board.cells[k].beaten);
+});
+
+// ── medkit ───────────────────────────────────────────────────────────────────
+test("medkit restores stamina (capped at maxStamina) and emits a medkit event", () => {
+  const s = G.createGame("day:5", NORMAL);
+  // Put a medkit on a frontier safe cell, drop stamina so a restore is visible.
+  const target = firstFrontier(s, (i) => i !== s.board.keeperIdx);
+  assert.ok(target >= 0);
+  s.board.cells[target].kind = "medkit";
+  s.board.cells[target].power = 0;
+  s.board.cells[target].pressure = 5; // non-zero so it doesn't cascade further
+  s.player.stamina = 1; s.player.maxStamina = 10;
+  const ev = G.revealCell(s, target, {});
+  const med = ev.find((e) => e.type === "medkit");
+  assert.ok(med, "expected a medkit event");
+  assert.strictEqual(med.restored, NORMAL.medkitRestore); // +3
+  assert.strictEqual(s.player.stamina, 4);
+  assert.strictEqual(med.stamina, 4);
+  assert.ok(s.board.cells[target].revealed);
+});
+
+test("medkit restore is capped at maxStamina (no overheal)", () => {
+  const s = G.createGame("day:5", NORMAL);
+  const target = firstFrontier(s, (i) => i !== s.board.keeperIdx);
+  s.board.cells[target].kind = "medkit";
+  s.board.cells[target].power = 0;
+  s.board.cells[target].pressure = 5;
+  s.player.maxStamina = 5; s.player.stamina = 4; // +3 would be 7, capped to 5
+  const ev = G.revealCell(s, target, {});
+  const med = ev.find((e) => e.type === "medkit");
+  assert.strictEqual(s.player.stamina, 5);
+  assert.strictEqual(med.restored, 1); // only 1 actually restored
+});
+
+test("a medkit revealed by the flood cascade auto-applies its restore", () => {
+  // Build a tiny all-safe board with a medkit reachable by a zero-pressure cascade.
+  const cols = 3, rows = 3;
+  const cells = [];
+  for (let i = 0; i < rows * cols; i++) {
+    cells.push({ power: 0, kind: "field", pressure: 0, revealed: false, marked: false, beaten: false, lost: false });
+  }
+  cells[0].kind = "medkit"; // top-left medkit, all pressures 0 -> cascade reaches it
+  const startIdx = (rows - 1) * cols + 1;
+  const board = { cells, startIdx, keeperIdx: 1, rows, cols };
+  const state = {
+    cfg: NORMAL, board,
+    player: { skill: 1, stamina: 2, maxStamina: 10, xp: 0, level: 0 },
+    status: "playing", ballIdx: startIdx, keeperIdx: 1, pendingLevels: 0, events: [],
+  };
+  const ev = G.revealCell(state, startIdx, { initial: true, force: true });
+  assert.ok(ev.some((e) => e.type === "medkit"), "cascade should auto-apply the medkit");
+  assert.strictEqual(state.player.stamina, 5); // 2 + 3
+});
+
+// ── manual level-up ────────────────────────────────────────────────────────────
+test("canLevelUp is false below threshold, true at/above it; levelUp heals + skill+1 + maxStamina+2", () => {
+  const s = G.createGame("day:9", NORMAL);
+  s.player.xp = NORMAL.xpThresholds[0] - 1; // just below first tier
+  assert.strictEqual(G.canLevelUp(s), false, "below threshold");
+  assert.deepStrictEqual(G.levelUp(s), [], "levelUp is a no-op below threshold");
+
+  s.player.xp = NORMAL.xpThresholds[0]; // exactly at first tier
+  assert.strictEqual(G.canLevelUp(s), true, "at threshold");
+  const beforeSkill = s.player.skill, beforeMax = s.player.maxStamina;
+  s.player.stamina = 1; // ensure heal is visible
+  const ev = G.levelUp(s);
+  assert.strictEqual(ev.length, 1);
+  assert.strictEqual(ev[0].type, "levelup");
+  assert.strictEqual(s.player.level, 1);
+  assert.strictEqual(s.player.skill, beforeSkill + 1);          // skill +1
+  assert.strictEqual(s.player.maxStamina, beforeMax + 2);        // maxStamina +2
+  assert.strictEqual(s.player.stamina, s.player.maxStamina);     // FULL heal
+  assert.strictEqual(ev[0].skill, s.player.skill);
+  assert.strictEqual(ev[0].maxStamina, s.player.maxStamina);
+  assert.strictEqual(ev[0].stamina, s.player.stamina);
+});
+
+test("level-up is MANUAL: a duel that crosses a threshold does NOT auto-level", () => {
+  const { s, target } = injectDuel("day:9", 4); // +4 xp
+  s.player.xp = NORMAL.xpThresholds[0] - 4 + 4; // arrange so beating crosses tier 0... set below:
+  s.player.xp = 0;
+  // First threshold is 4; a single +4 win crosses it.
+  s.player.stamina = 9; s.player.skill = 1;
+  const ev = G.revealCell(s, target, {});
+  assert.ok(ev.some((e) => e.type === "duel" && e.success));
+  assert.ok(!ev.some((e) => e.type === "levelup"), "no auto-level inside the duel");
+  assert.strictEqual(s.player.level, 0, "level unchanged by the duel");
+  assert.strictEqual(s.player.xp, 4);
+  assert.strictEqual(G.canLevelUp(s), true, "but the level-up is now bankable");
+  assert.strictEqual(s.pendingLevels, 1, "pendingLevels reflects the bankable level");
+});
+
+test("pendingLevels tracks how many bankable level-ups exist", () => {
+  const s = G.createGame("day:9", NORMAL);
+  s.player.xp = NORMAL.xpThresholds[1]; // crosses tiers 0 and 1
+  // recompute via a no-op reveal is not available; pendingLevels is set on duels/levelUp.
+  // Use levelUp to bank one and check the residual count.
+  assert.strictEqual(G.canLevelUp(s), true);
+  G.levelUp(s); // level 1
+  assert.strictEqual(s.pendingLevels, 1, "still one more bankable (tier 1 crossed)");
+  G.levelUp(s); // level 2
+  assert.strictEqual(s.pendingLevels, 0, "no more bankable");
+  assert.strictEqual(G.canLevelUp(s), false);
+});
+
+// ── stranded loss ───────────────────────────────────────────────────────────
+test("isStranded => a non-winning move triggers a 'stranded' gameover", () => {
+  // 3x4 grid: open approach (rows 2 & 3) flooded from the start, a wall of power-4 defenders on
+  // row 1 the player can never afford (skill 1, 0 stamina => cost 3), keeper at row 0.
+  const cols = 3, rows = 4;
+  const cells = [];
+  for (let i = 0; i < rows * cols; i++) {
+    cells.push({ power: 0, kind: "field", pressure: 0, revealed: false, marked: false, beaten: false, lost: false });
+  }
+  for (let c = 0; c < cols; c++) { cells[1 * cols + c].power = 4; cells[1 * cols + c].kind = "field"; }
+  const keeperIdx = 0 * cols + 1;
+  cells[keeperIdx].kind = "keeper"; cells[keeperIdx].power = 13; cells[keeperIdx].revealed = true;
+  const startIdx = (rows - 1) * cols + 1;
+  const board = { cells, startIdx, keeperIdx, rows, cols };
+  const state = {
+    cfg: NORMAL, board,
+    player: { skill: 1, stamina: 0, maxStamina: 6, xp: 0, level: 0 },
+    status: "playing", ballIdx: startIdx, keeperIdx, pendingLevels: 0, events: [],
+  };
+  G.revealCell(state, startIdx, { initial: true, force: true }); // floods rows 2 & 3
+  assert.strictEqual(state.status, "playing", "opening reveal must not strand");
+  assert.strictEqual(G.isStranded(state), true, "should report stranded (wall unaffordable)");
+  // Re-hide a safe approach cell, then reveal it as a non-winning move to trip the check.
+  cells[2 * cols + 0].revealed = false;
+  const ev = G.revealCell(state, 2 * cols + 0, {});
+  const over = ev.find((e) => e.type === "gameover");
+  assert.ok(over, "expected a gameover after the stranded move");
+  assert.strictEqual(over.reason, "stranded");
+  assert.strictEqual(over.stamina, 0);
+  assert.strictEqual(state.status, "lost");
+});
+
+test("not stranded when an affordable defender borders the region", () => {
+  const cols = 3, rows = 4;
+  const cells = [];
+  for (let i = 0; i < rows * cols; i++) {
+    cells.push({ power: 0, kind: "field", pressure: 0, revealed: false, marked: false, beaten: false, lost: false });
+  }
+  for (let c = 0; c < cols; c++) { cells[1 * cols + c].power = 2; cells[1 * cols + c].kind = "field"; }
+  const keeperIdx = 1;
+  cells[keeperIdx].kind = "keeper"; cells[keeperIdx].power = 13; cells[keeperIdx].revealed = true;
+  const startIdx = (rows - 1) * cols + 1;
+  const board = { cells, startIdx, keeperIdx, rows, cols };
+  const state = {
+    cfg: NORMAL, board,
+    player: { skill: 1, stamina: 2, maxStamina: 6, xp: 0, level: 0 },
+    status: "playing", ballIdx: startIdx, keeperIdx, pendingLevels: 0, events: [],
+  };
+  G.revealCell(state, startIdx, { initial: true, force: true });
+  assert.strictEqual(G.isStranded(state), false, "a power-2 wall is affordable at skill 1, stamina 2");
+});
+
+// ── scouting ───────────────────────────────────────────────────────────────
+test("scout returns remaining counts per power + keeper info + skillNeededForKeeper", () => {
+  const s = G.createGame("day:2", NORMAL);
+  const sc = G.scout(s);
+  // Initially no field defenders beaten -> counts match the preset squad.
+  assert.strictEqual(sc.remaining[1], NORMAL.defenders.p1);
+  assert.strictEqual(sc.remaining[2], NORMAL.defenders.p2);
+  assert.strictEqual(sc.remaining[3], NORMAL.defenders.p3);
+  assert.strictEqual(sc.remaining[4], NORMAL.defenders.p4);
+  assert.strictEqual(sc.keeperPower, NORMAL.keeperPower);
+  assert.strictEqual(sc.keeperBeaten, false);
+  // smallest skill s.t. keeperPower - skill <= maxStamina  => keeperPower - maxStamina.
+  assert.strictEqual(sc.skillNeededForKeeper, Math.max(0, NORMAL.keeperPower - s.player.maxStamina));
+});
+
+test("scout decrements a power count when that defender is beaten, is a pure read", () => {
+  const { s, target } = injectDuel("day:9", 2);
+  const before = G.scout(s).remaining[2];
+  const snapshotXp = s.player.xp;
+  G.revealCell(s, target, {}); // beat the injected power-2 defender
+  const after = G.scout(s).remaining[2];
+  assert.strictEqual(after, before - 1, "beaten power-2 defender removed from remaining");
+  // scout must not mutate state.
+  const a = G.scout(s), b = G.scout(s);
+  assert.deepStrictEqual(a, b);
+  assert.strictEqual(s.player.xp, snapshotXp + 2); // only the duel changed xp, not scout()
+});
+
+test("skillNeededForKeeper falls as maxStamina grows (level-ups make the keeper reachable)", () => {
+  const s = G.createGame("day:2", HARD);
+  const need0 = G.scout(s).skillNeededForKeeper; // keeper 17, maxStamina 5 => 12
+  assert.strictEqual(need0, Math.max(0, HARD.keeperPower - HARD.maxStaminaStart));
+  s.player.maxStamina += 4; // simulate two level-ups (+2 each)
+  const need1 = G.scout(s).skillNeededForKeeper;
+  assert.ok(need1 < need0, "more maxStamina => lower skill needed for the keeper");
+});
+
+// ── marking ──────────────────────────────────────────────────────────────────
+test("marking toggles and a marked cell is blocked from reveal", () => {
+  const s = G.createGame("day:5", NORMAL);
+  let target = -1;
+  for (let i = 0; i < s.board.cells.length; i++) {
+    const c = s.board.cells[i];
+    if (!c.revealed && c.kind === "field" && c.power === 0) { target = i; break; }
+  }
+  assert.ok(target >= 0, "no hidden safe cell found");
+  G.toggleMark(s, target);
+  assert.ok(s.board.cells[target].marked);
+  const ev = G.revealCell(s, target, {});
+  assert.ok(ev.some((e) => e.type === "blocked"));
+  assert.strictEqual(s.board.cells[target].revealed, false);
+});
+
+// ── winnability ───────────────────────────────────────────────────────────────
+test("every preset generates winnable boards across several seeds (and fast)", () => {
+  const t0 = Date.now();
   [EASY, NORMAL, HARD].forEach((cfg) => {
-    for (let d = 1; d <= 15; d++) {
+    for (let d = 1; d <= 25; d++) {
       const b = G.generateBoard("day:" + d, cfg);
       assert.ok(G.isWinnable(b, cfg), cfg.difficulty + " day " + d + " not winnable");
     }
   });
+  const ms = Date.now() - t0;
+  assert.ok(ms < 3000, "generation/winnability across 75 boards too slow: " + ms + "ms");
 });
 
-// ── isWinnable soundness cross-check ──────────────────────────────────────────
-// Independently verify that isWinnable's "true" verdict is consistent with the board ACTUALLY
-// being beatable by the real engine. We drive createGame/revealCell through a depth-first search
-// over duel choices (safe frontier cells are always taken first — free progress), backtracking
-// by re-running from the seed and replaying a chosen duel sequence. If isWinnable says true but
-// no play reaches the goal, the validator and engine disagree (would accept unwinnable boards).
-function enginePlayable(seedKey, cfg) {
-  // Snapshot helper: deep-clone the mutable parts of a game state so we can branch on duels.
-  function clone(s) {
-    return {
-      cfg: s.cfg,
-      board: {
-        cells: s.board.cells.map((c) => ({ ...c })),
-        startIdx: s.board.startIdx, offsideRow: s.board.offsideRow,
-        rows: s.board.rows, cols: s.board.cols,
-      },
-      player: { ...s.player },
-      status: s.status, ballIdx: s.ballIdx, events: [],
-    };
+test("isWinnable: crafted clearly-winnable board (keeper reachable + affordable)", () => {
+  // 3x3, open, keeper power 1 at the centre-top -> trivially beatable.
+  const cols = 3, rows = 3;
+  const cells = [];
+  for (let i = 0; i < rows * cols; i++) {
+    cells.push({ power: 0, kind: "field", pressure: 0, revealed: false, marked: false, beaten: false, lost: false });
   }
+  const keeperIdx = 1;
+  cells[keeperIdx].kind = "keeper"; cells[keeperIdx].power = 1; cells[keeperIdx].revealed = true;
+  const startIdx = (rows - 1) * cols + 1;
+  const board = { cells, startIdx, keeperIdx, rows, cols };
+  const cfg = Object.assign({}, NORMAL, { keeperPower: 1 });
+  assert.strictEqual(G.isWinnable(board, cfg), true);
+});
+
+test("isWinnable: hopeless board (keeper walled off, 0 stamina, no XP) returns false", () => {
+  // Keeper at row 0; a solid wall of power-4 defenders on row 1; start with 0 stamina + no leveling.
+  const cols = 3, rows = 4;
+  const cells = [];
+  for (let i = 0; i < rows * cols; i++) {
+    cells.push({ power: 0, kind: "field", pressure: 0, revealed: false, marked: false, beaten: false, lost: false });
+  }
+  for (let c = 0; c < cols; c++) { cells[1 * cols + c].power = 4; cells[1 * cols + c].kind = "field"; }
+  const keeperIdx = 1;
+  cells[keeperIdx].kind = "keeper"; cells[keeperIdx].power = 13; cells[keeperIdx].revealed = true;
+  const startIdx = (rows - 1) * cols + 1;
+  const board = { cells, startIdx, keeperIdx, rows, cols };
+  const cfg = Object.assign({}, NORMAL, {
+    start: { skill: 1, stamina: 0 }, maxStaminaStart: 0,
+    xpThresholds: [999, 999, 999], keeperPower: 13,
+  });
+  assert.strictEqual(G.isWinnable(board, cfg), false);
+});
+
+test("isWinnable: a board with no keeper is never winnable", () => {
+  const cols = 3, rows = 3;
+  const cells = [];
+  for (let i = 0; i < rows * cols; i++) {
+    cells.push({ power: 0, kind: "field", pressure: 0, revealed: false, marked: false, beaten: false, lost: false });
+  }
+  const startIdx = (rows - 1) * cols + 1;
+  const board = { cells, startIdx, keeperIdx: -1, rows, cols };
+  assert.strictEqual(G.isWinnable(board, NORMAL), false);
+});
+
+// ── isWinnable soundness cross-check (independent engine playthrough) ──────────
+// Drive the REAL engine (createGame/revealCell/levelUp) with a greedy/DFS solver and confirm
+// that boards isWinnable accepts are actually beatable to the keeper. The solver:
+//   - reveals all safe/medkit frontier cells first (free progress + restores),
+//   - levels up whenever it can AND stamina is low or it cannot otherwise progress,
+//   - branches over affordable frontier defenders (cheapest first), incl. the actionable keeper.
+function clone(s) {
+  return {
+    cfg: s.cfg,
+    board: {
+      cells: s.board.cells.map((c) => ({ ...c })),
+      startIdx: s.board.startIdx, keeperIdx: s.board.keeperIdx,
+      rows: s.board.rows, cols: s.board.cols,
+    },
+    player: { ...s.player },
+    status: s.status, ballIdx: s.ballIdx, keeperIdx: s.keeperIdx, pendingLevels: s.pendingLevels,
+    events: [],
+  };
+}
+
+function enginePlayable(seedKey, cfg) {
   const root = G.createGame(seedKey, cfg);
   let nodes = 0;
-  const CAP = 200000;
-  // DFS over states. At each state: flood all safe frontier cells first (free, deterministic),
-  // then branch on each affordable frontier defender.
-  function solve(state) {
-    if (++nodes > CAP) return false;
-    if (state.status === "won") return true;
-    if (state.status === "lost") return false;
-    // 1) Take every safe frontier reveal (free). Each may win or open more region.
+  const CAP = 300000;
+  function takeFreeProgress(state) {
     let progressed = true;
     while (progressed && state.status === "playing") {
       progressed = false;
       for (let i = 0; i < state.board.cells.length; i++) {
-        if (G.isFrontier(state, i) && state.board.cells[i].def === 0) {
+        const c = state.board.cells[i];
+        if (G.isFrontier(state, i) && (c.kind === "field" || c.kind === "medkit") && c.power === 0) {
           G.revealCell(state, i, {});
           progressed = true;
-          if (state.status === "won") return true;
-          if (state.status === "lost") return false;
+          if (state.status !== "playing") return;
         }
       }
     }
+  }
+  function solve(state) {
+    if (++nodes > CAP) return false;
+    if (state.status === "won") return true;
+    if (state.status === "lost") return false;
+    takeFreeProgress(state);
     if (state.status === "won") return true;
     if (state.status !== "playing") return false;
-    // 2) Branch on each affordable frontier defender.
+
+    // Gather actionable defenders/keeper (frontier defenders + the actionable keeper).
+    const acts = [];
     for (let i = 0; i < state.board.cells.length; i++) {
-      if (!G.isFrontier(state, i)) continue;
-      const cell = state.board.cells[i];
-      if (cell.def === 0) continue;
-      const cost = Math.max(0, cell.def - state.player.skill);
+      const c = state.board.cells[i];
+      if (!G.isActable(state, i)) continue;
+      if (c.kind === "field" || c.kind === "keeper") {
+        if (c.power > 0 && !c.beaten) acts.push(i);
+      }
+    }
+    // Branch A: take any available level-up (full heal) — try it as a distinct option.
+    if (G.canLevelUp(state)) {
+      const branch = clone(state);
+      G.levelUp(branch);
+      if (solve(branch)) return true;
+    }
+    // Branch B: beat each affordable actionable defender/keeper, cheapest power first.
+    acts.sort((a, b) => state.board.cells[a].power - state.board.cells[b].power);
+    for (const i of acts) {
+      const c = state.board.cells[i];
+      const cost = Math.max(0, c.power - state.player.skill);
       if (cost > state.player.stamina) continue;
       const branch = clone(state);
       G.revealCell(branch, i, {});
@@ -272,327 +647,14 @@ function enginePlayable(seedKey, cfg) {
 
 test("isWinnable soundness: a 'true' verdict is actually beatable by the real engine", () => {
   [EASY, NORMAL, HARD].forEach((cfg) => {
-    for (let d = 1; d <= 12; d++) {
+    for (let d = 1; d <= 10; d++) {
       const seed = "day:" + d;
       const b = G.generateBoard(seed, cfg);
-      if (!G.isWinnable(b, cfg)) continue; // only cross-check the boards the validator accepts
+      if (!G.isWinnable(b, cfg)) continue; // only cross-check accepted boards
       assert.ok(enginePlayable(seed, cfg),
         cfg.difficulty + " " + seed + ": isWinnable=true but engine could not beat it");
     }
   });
-});
-
-// ── isWinnable: crafted boards ────────────────────────────────────────────────
-// Build a bare board: all-safe grid, single defender row config we control.
-function craftBoard(rows, cols, startCol, defs) {
-  const n = rows * cols;
-  const cells = new Array(n);
-  for (let i = 0; i < n; i++) {
-    cells[i] = { def: 0, pressure: 0, revealed: false, marked: false, beaten: false, lost: false };
-  }
-  const startIdx = (rows - 1) * cols + startCol;
-  defs.forEach(({ r, c, def }) => { cells[r * cols + c].def = def; });
-  return { cells, startIdx, offsideRow: 2, rows, cols };
-}
-
-test("isWinnable: clearly-winnable board returns true", () => {
-  // 4x3, start bottom-centre, completely open -> reach row 0 with zero duels.
-  const b = craftBoard(4, 3, 1, []);
-  assert.ok(G.isWinnable(b, NORMAL));
-});
-
-test("isWinnable: winnable through one affordable duel", () => {
-  // 4x3 with a single rating-2 defender blocking, skill 1 + plenty of stamina => affordable.
-  const cfg = CONFIG.resolve("normal");
-  const b = craftBoard(4, 3, 1, [
-    { r: 1, c: 0, def: 2 }, { r: 1, c: 1, def: 2 }, { r: 1, c: 2, def: 2 },
-  ]);
-  // Wall across row 1 (8-dir) but each costs 1 with skill 1, stamina 5 => beatable.
-  assert.ok(G.isWinnable(b, cfg));
-});
-
-test("isWinnable: hopeless board (unaffordable wall, 0 stamina) returns false", () => {
-  // Goal row reachable only through a solid row of rating-3 defenders. With skill 1 and
-  // 0 stamina every duel costs 2 > 0 => cannot be attempted => not winnable.
-  const cfg = Object.assign({}, CONFIG.resolve("normal"), {
-    start: { skill: 1, stamina: 0 },
-    xpThresholds: [999, 999, 999, 999, 999], // never level up
-  });
-  // 3x3 grid: wall the entire middle row so the open start cannot flood to row 0.
-  const b = craftBoard(3, 3, 1, [
-    { r: 1, c: 0, def: 3 }, { r: 1, c: 1, def: 3 }, { r: 1, c: 2, def: 3 },
-  ]);
-  assert.strictEqual(G.isWinnable(b, cfg), false);
-});
-
-test("isWinnable: hopeless board where goal row is fully walled by rating-3s", () => {
-  // The goal row (row 0) is itself all defenders rated 3, unaffordable with 0 stamina.
-  const cfg = Object.assign({}, CONFIG.resolve("normal"), {
-    start: { skill: 1, stamina: 0 },
-    xpThresholds: [999, 999, 999, 999, 999],
-  });
-  const b = craftBoard(3, 4, 1, [
-    { r: 0, c: 0, def: 3 }, { r: 0, c: 1, def: 3 }, { r: 0, c: 2, def: 3 }, { r: 0, c: 3, def: 3 },
-  ]);
-  assert.strictEqual(G.isWinnable(b, cfg), false);
-});
-
-// ── opening move ─────────────────────────────────────────────────────────────
-test("opening move reveals the start cell and is free", () => {
-  const s = G.createGame("day:5", NORMAL);
-  assert.ok(s.board.cells[s.board.startIdx].revealed);
-  assert.strictEqual(s.player.stamina, NORMAL.start.stamina);
-  assert.strictEqual(s.status, "playing");
-});
-
-test("createGame defaults to the daily (normal) preset when no cfg passed", () => {
-  const s = G.createGame("day:5");
-  assert.strictEqual(s.board.cols, 10);
-  assert.strictEqual(s.player.maxStamina, NORMAL.start.stamina); // 3 under the hardcore economy
-});
-
-test("a zero-pressure start cascades to several cells", () => {
-  // Find a day whose start pressure is 0 so a cascade happens.
-  let cascaded = false;
-  for (let d = 1; d <= 40 && !cascaded; d++) {
-    const s = G.createGame("day:" + d, NORMAL);
-    const revealed = s.board.cells.filter((c) => c.revealed).length;
-    if (s.board.cells[s.board.startIdx].pressure === 0) {
-      assert.ok(revealed > 1, "expected cascade on day " + d);
-      cascaded = true;
-    }
-  }
-  assert.ok(cascaded, "no zero-pressure start found in 40 days (unexpected)");
-});
-
-// ── dribbling adjacency ──────────────────────────────────────────────────────
-test("cannot reveal a non-adjacent cell (dribbling rule)", () => {
-  const s = G.createGame("day:5", NORMAL);
-  // top-left corner is far from the bottom-centre start; should be illegal at first.
-  const far = G.index(0, 0, s.board.cols);
-  if (!s.board.cells[far].revealed) {
-    const ev = G.revealCell(s, far, {});
-    assert.ok(ev.some((e) => e.type === "illegal"), "expected illegal move");
-    assert.strictEqual(s.board.cells[far].revealed, false);
-  }
-});
-
-// ── duel mechanics ───────────────────────────────────────────────────────────
-// A reveal-able target must be a *frontier* cell (hidden + adjacent to a revealed passable
-// cell). On Normal the opening cascade floods the whole defender-free approach region, so the
-// ball's own neighbours may already be revealed — find any frontier cell instead of relying
-// on an unrevealed neighbour of the ball.
-function firstFrontier(s, pred) {
-  for (let i = 0; i < s.board.cells.length; i++) {
-    if (G.isFrontier(s, i) && (!pred || pred(i))) return i;
-  }
-  return -1;
-}
-
-function injectDuel(seed, rating) {
-  // Fresh game; force a defender of the given rating on a frontier cell next to the ball.
-  const s = G.createGame(seed, NORMAL);
-  const target = firstFrontier(s);
-  assert.ok(target >= 0, "no frontier cell found for " + seed);
-  s.board.cells[target].def = rating;
-  s.board.cells[target].pressure = 0;
-  return { s, target };
-}
-
-test("duel within skill is free (cost 0) and still grants XP = rating", () => {
-  const { s, target } = injectDuel("day:9", 1); // rating 1 <= skill 1 => free
-  const beforeStamina = s.player.stamina;
-  const ev = G.revealCell(s, target, {});
-  const duel = ev.find((e) => e.type === "duel");
-  assert.strictEqual(duel.cost, 0);
-  assert.strictEqual(s.player.stamina, beforeStamina); // no stamina spent
-  assert.strictEqual(s.player.xp, 1);
-  assert.ok(s.board.cells[target].beaten);
-});
-
-test("duel above skill costs stamina = rating - skill", () => {
-  const { s, target } = injectDuel("day:9", 2); // rating 2 > skill 1 => cost 1, xp 2 < threshold
-  const beforeStamina = s.player.stamina;
-  const ev = G.revealCell(s, target, {});
-  const duel = ev.find((e) => e.type === "duel");
-  assert.strictEqual(duel.cost, 2 - NORMAL.start.skill);
-  assert.ok(!ev.some((e) => e.type === "levelup"), "should not level up yet");
-  assert.strictEqual(s.player.stamina, beforeStamina - duel.cost);
-  assert.strictEqual(s.player.xp, 2);
-});
-
-test("losing a duel (cost > stamina) ends the game with a 'tackle' gameover", () => {
-  const s = G.createGame("day:9", NORMAL);
-  s.player.stamina = 0;
-  s.player.skill = 1;
-  const target = firstFrontier(s);
-  assert.ok(target >= 0, "no frontier cell found");
-  s.board.cells[target].def = 3; // cost = 2 > 0 stamina
-  s.board.cells[target].pressure = 0;
-  const ev = G.revealCell(s, target, {});
-  const over = ev.find((e) => e.type === "gameover");
-  assert.ok(over, "expected a gameover event");
-  assert.strictEqual(over.reason, "tackle");
-  assert.strictEqual(over.idx, target);
-  assert.strictEqual(over.rating, 3);
-  assert.strictEqual(over.cost, 2);
-  assert.strictEqual(over.stamina, 0); // what the player HAD (< cost)
-  assert.strictEqual(s.status, "lost");
-});
-
-// ── leveling ─────────────────────────────────────────────────────────────────
-test("crossing an XP threshold raises skill, grows max, and PARTIALLY refills stamina", () => {
-  // Normal: levelRefill = 2 (NOT a full refill). Craft a single affordable rating-3 duel that
-  // crosses exactly one threshold, then verify stamina = min(newMax, prevStamina - cost + 2).
-  const s = G.createGame("day:9", NORMAL);
-  const beforeSkill = s.player.skill;     // 1
-  const beforeMax = s.player.maxStamina;  // 3
-  s.player.xp = NORMAL.xpThresholds[0] - 3; // one rating-3 win (+3 xp) crosses the first tier
-  const target = firstFrontier(s);
-  assert.ok(target >= 0, "no frontier cell found");
-  s.board.cells[target].def = 3;
-  s.board.cells[target].pressure = 0;
-  // skill 1 vs rating 3 => cost 2; give enough to afford it with a known remainder.
-  s.player.stamina = 3;
-  const ev = G.revealCell(s, target, {});
-  assert.ok(ev.some((e) => e.type === "levelup"), "should level up");
-  assert.strictEqual(s.player.skill, beforeSkill + 1);
-  assert.strictEqual(s.player.maxStamina, beforeMax + 1); // 4
-  // After paying cost 2 from 3 => 1 stamina; +levelRefill(2) = 3, capped at new max 4 => 3.
-  const expected = Math.min(beforeMax + 1, (3 - 2) + NORMAL.levelRefill);
-  assert.strictEqual(s.player.stamina, expected);          // 3, NOT a full refill to 4
-  assert.ok(s.player.stamina < s.player.maxStamina, "partial refill did not top up to max");
-});
-
-test("Hard level-up refills only levelRefill(1) stamina, not to full", () => {
-  const s = G.createGame("day:9", HARD);
-  s.player.xp = HARD.xpThresholds[0] - 3; // one rating-3 win crosses the first tier
-  const target = firstFrontier(s);
-  assert.ok(target >= 0, "no frontier cell found");
-  s.board.cells[target].def = 3;          // cost 2 at skill 1
-  s.board.cells[target].pressure = 0;
-  s.player.stamina = 4;
-  const beforeMax = s.player.maxStamina;
-  const ev = G.revealCell(s, target, {});
-  assert.ok(ev.some((e) => e.type === "levelup"));
-  // 4 - 2 = 2, + levelRefill(1) = 3, capped at new max (beforeMax + 1).
-  const expected = Math.min(beforeMax + 1, (4 - 2) + HARD.levelRefill);
-  assert.strictEqual(s.player.stamina, expected);
-});
-
-// ── stranded loss (soft-lock closed) ──────────────────────────────────────────
-test("isStranded: every frontier is an unaffordable defender => move triggers a 'stranded' loss", () => {
-  // Craft a small grid: an open row 2 (approach) flooded from the start, then a wall of
-  // rating-3 defenders on row 1 that the player can never afford (skill 1, 0 stamina => cost 2).
-  // After revealing a safe approach cell (which doesn't win), the engine must detect the lock.
-  const cols = 3, rows = 4;
-  const cells = [];
-  for (let i = 0; i < rows * cols; i++) {
-    cells.push({ def: 0, pressure: 0, revealed: false, marked: false, beaten: false, lost: false });
-  }
-  // Wall row 1 entirely with rating-3 defenders.
-  for (let c = 0; c < cols; c++) cells[1 * cols + c].def = 3;
-  const startIdx = (rows - 1) * cols + 1; // bottom-centre
-  const board = { cells, startIdx, offsideRow: 1, rows, cols };
-  // Build a state by hand so we control the player economy precisely.
-  const state = {
-    cfg: NORMAL, board,
-    player: { skill: 1, stamina: 0, maxStamina: 3, xp: 0, level: 0 },
-    status: "playing", ballIdx: startIdx, events: [],
-  };
-  // Reveal the start (initial: never strands) — floods the open approach (rows 2 & 3).
-  G.revealCell(state, startIdx, { initial: true, force: true });
-  assert.strictEqual(state.status, "playing", "opening reveal must not strand");
-  // Sanity: every frontier cell is now a rating-3 defender (the wall), all unaffordable.
-  let frontierDefenders = 0;
-  for (let i = 0; i < cells.length; i++) {
-    if (G.isFrontier(state, i)) { assert.strictEqual(cells[i].def, 3); frontierDefenders++; }
-  }
-  assert.ok(frontierDefenders > 0, "expected wall defenders on the frontier");
-  assert.strictEqual(G.isStranded(state), true, "should report stranded");
-  // A subsequent non-initial reveal of an already-safe frontier-adjacent cell... but all
-  // frontier cells are walls. Instead, re-reveal via a safe move on the approach to trigger the
-  // post-action stranded check. Reveal a still-hidden safe approach cell adjacent to the ball.
-  // Simpler: drive any non-initial action and assert the loss. Find a hidden safe cell to mark/
-  // unmark then reveal — but cleanest is to call revealCell on a safe frontier-adjacent... none.
-  // So directly exercise the check via a no-win safe reveal: pick a hidden safe cell and reveal.
-  // Here the whole approach is already revealed, so use the public path: a duel attempt that the
-  // player cannot win is a 'tackle' loss, not stranded. To test the STRANDED path specifically,
-  // reveal a safe cell that does not win. We force one hidden safe cell at row 2 then reveal it.
-  cells[2 * cols + 0].revealed = false; // re-hide a safe approach cell
-  const ev = G.revealCell(state, 2 * cols + 0, {});
-  const over = ev.find((e) => e.type === "gameover");
-  assert.ok(over, "expected a gameover event after the stranded move");
-  assert.strictEqual(over.reason, "stranded");
-  assert.strictEqual(over.stamina, 0);
-  assert.strictEqual(over.idx, state.ballIdx);
-  assert.strictEqual(state.status, "lost");
-});
-
-test("gameover events carry a reason ('tackle' on unaffordable duel, 'stranded' otherwise)", () => {
-  // tackle
-  const s1 = G.createGame("day:9", NORMAL);
-  s1.player.stamina = 0;
-  const t1 = firstFrontier(s1);
-  s1.board.cells[t1].def = 3; s1.board.cells[t1].pressure = 0;
-  const ev1 = G.revealCell(s1, t1, {});
-  assert.strictEqual(ev1.find((e) => e.type === "gameover").reason, "tackle");
-
-  // stranded: build a hand-state whose only frontier options are unaffordable, then reveal a
-  // safe (non-winning) cell to trip the post-action check.
-  const cols = 3, rows = 4;
-  const cells = [];
-  for (let i = 0; i < rows * cols; i++) {
-    cells.push({ def: 0, pressure: 0, revealed: false, marked: false, beaten: false, lost: false });
-  }
-  for (let c = 0; c < cols; c++) cells[1 * cols + c].def = 3;
-  const startIdx = (rows - 1) * cols + 1;
-  const board = { cells, startIdx, offsideRow: 1, rows, cols };
-  const s2 = {
-    cfg: NORMAL, board,
-    player: { skill: 1, stamina: 0, maxStamina: 3, xp: 0, level: 0 },
-    status: "playing", ballIdx: startIdx, events: [],
-  };
-  G.revealCell(s2, startIdx, { initial: true, force: true });
-  cells[2 * cols + 2].revealed = false; // re-hide a safe cell to reveal as a non-winning move
-  const ev2 = G.revealCell(s2, 2 * cols + 2, {});
-  assert.strictEqual(ev2.find((e) => e.type === "gameover").reason, "stranded");
-});
-
-// ── marking ──────────────────────────────────────────────────────────────────
-test("marking toggles and a marked cell is blocked from reveal", () => {
-  const s = G.createGame("day:5", NORMAL);
-  // Any hidden safe cell will do: toggleMark/blocked don't require frontier adjacency.
-  let target = -1;
-  for (let i = 0; i < s.board.cells.length; i++) {
-    if (!s.board.cells[i].revealed && s.board.cells[i].def === 0) { target = i; break; }
-  }
-  assert.ok(target >= 0, "no hidden safe cell found");
-  G.toggleMark(s, target);
-  assert.ok(s.board.cells[target].marked);
-  const ev = G.revealCell(s, target, {});
-  assert.ok(ev.some((e) => e.type === "blocked"));
-  assert.strictEqual(s.board.cells[target].revealed, false);
-});
-
-// ── win condition ────────────────────────────────────────────────────────────
-test("revealing/occupying a goal-row cell wins (Easy, guaranteed safe path)", () => {
-  // Easy guarantees a fully-safe path; walk it greedily upward to confirm a goal is reachable.
-  const s = G.createGame("day:11", EASY);
-  let guard = 0;
-  while (s.status === "playing" && guard++ < 500) {
-    // collect frontier safe cells, prefer the one with the smallest row (closest to goal)
-    let best = -1, bestRow = 99;
-    for (let i = 0; i < s.board.cells.length; i++) {
-      if (G.isFrontier(s, i) && s.board.cells[i].def === 0) {
-        const r = G.rowOf(i, s.board.cols);
-        if (r < bestRow) { bestRow = r; best = i; }
-      }
-    }
-    if (best < 0) break;
-    G.revealCell(s, best, {});
-  }
-  assert.strictEqual(s.status, "won", "greedy safe walk should reach the goal");
 });
 
 console.log("\n" + passed + " checks passed.");

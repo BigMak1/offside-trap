@@ -8,7 +8,7 @@ node_modules/
 # Deploy / build / QA artifacts
 .vercel/
 .playwright-mcp/
-assets/_build/_preview.png
+assets/_build/_*.png
 
 # Temp scratch & screenshots (keep the repo clean for agents reading it)
 /*.png

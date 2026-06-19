@@ -15,34 +15,40 @@
   // Stamina restored by picking up a medkit (safe cell). Capped at the player's maxStamina.
   var MEDKIT_RESTORE = 3;
 
+  // The keeper-boss is the SAME on every difficulty (like Dragonsweeper's dragon). Difficulty
+  // scales through the field: bigger pitch + more defenders + more high-level ones — NOT a tougher
+  // keeper. NOTE: the winnability validator uses a 32-bit mask, so keep
+  // (total field defenders + 1 keeper) <= 31 — i.e. field defenders <= ~30.
+  var KEEPER_POWER = 13;
+
   var PRESETS = {
     easy: {
-      label: "Лёгкий", cols: 7, rows: 10,
-      defenders: { p1: 6, p2: 4, p3: 2, p4: 0 },
-      keeperPower: 9,
-      start: { skill: 1, stamina: 7 },
-      maxStaminaStart: 7,
-      xpThresholds: [4, 9, 15, 22, 30],
+      label: "Лёгкий", cols: 8, rows: 12,
+      defenders: { p1: 9, p2: 6, p3: 3, p4: 1 },   // 19 field defenders
+      keeperPower: KEEPER_POWER,
+      start: { skill: 1, stamina: 8 },
+      maxStaminaStart: 8,
+      xpThresholds: [4, 9, 15, 22, 30, 40],
       medkits: 3,
       allowSafePath: false,
     },
     normal: {
-      label: "Норма", cols: 8, rows: 12,
-      defenders: { p1: 8, p2: 6, p3: 4, p4: 2 },
-      keeperPower: 13,
-      start: { skill: 1, stamina: 6 },
-      maxStaminaStart: 6,
+      label: "Норма", cols: 9, rows: 14,
+      defenders: { p1: 9, p2: 8, p3: 6, p4: 3 },   // 26 field defenders
+      keeperPower: KEEPER_POWER,
+      start: { skill: 1, stamina: 7 },
+      maxStaminaStart: 7,
       xpThresholds: [4, 9, 15, 22, 30, 40, 52],
       medkits: 2,
       allowSafePath: false,
     },
     hard: {
-      label: "Сложный", cols: 8, rows: 14,
-      defenders: { p1: 9, p2: 8, p3: 6, p4: 3 },
-      keeperPower: 17,
-      start: { skill: 1, stamina: 5 },
-      maxStaminaStart: 5,
-      xpThresholds: [5, 11, 18, 26, 35, 45, 57],
+      label: "Сложный", cols: 10, rows: 15,
+      defenders: { p1: 6, p2: 8, p3: 9, p4: 6 },   // 29 field defenders, weighted to high tiers
+      keeperPower: KEEPER_POWER,
+      start: { skill: 1, stamina: 6 },
+      maxStaminaStart: 6,
+      xpThresholds: [5, 11, 18, 26, 35, 45, 57, 70],
       medkits: 1,
       allowSafePath: false,
     },

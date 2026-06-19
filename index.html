@@ -44,26 +44,11 @@
       </header>
 
       <div class="hud">
-        <div class="stat" data-i18n-title="hud_skill" title="Skill">
-          <img class="stat-ico" src="assets/icon-skill.png" alt="skill" />
-          <span class="stat-num" id="skill-val">1</span>
+        <div class="stat stat--saves" data-i18n-title="hud_saves" title="Saves">
+          <img class="stat-ico" src="assets/artifact-save.png" alt="saves" />
+          <span class="stat-num" id="saves-val">0</span>
         </div>
-        <div class="stat stat--wide" data-i18n-title="hud_stamina" title="Stamina">
-          <img class="stat-ico" src="assets/icon-stamina.png" alt="stamina" />
-          <div class="bars">
-            <span class="stat-num" id="stamina-val">5 / 5</span>
-            <div class="bar"><i id="stamina-bar" class="fill fill--stamina"></i></div>
-          </div>
-        </div>
-        <div class="stat stat--wide" data-i18n-title="hud_level" title="Level / XP">
-          <span class="stat-label">LVL <span class="stat-num" id="level-val">0</span></span>
-          <div class="bar"><i id="xp-bar" class="fill fill--xp"></i></div>
-        </div>
-      </div>
-
-      <div class="actbar">
-        <div class="scout" id="scout"><!-- team sheet, built in JS --></div>
-        <button class="px-btn px-btn--level" id="btn-level" data-i18n="btn_level" disabled>+ LEVEL UP</button>
+        <div class="scout" id="scout"><!-- keeper goal + defenders left + artifacts, built in JS --></div>
       </div>
 
       <div class="board-wrap" id="board-wrap">

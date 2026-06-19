@@ -1,56 +1,47 @@
-// Offside Trap — single source of balance tuning (Stage 4: Dragonsweeper redesign).
+// Offside Trap — single source of balance tuning (Deduction redesign).
 // All numeric gameplay parameters live here so they can be balanced in one place.
 // Difficulty is preset-driven: PRESETS holds the per-difficulty knobs; CONFIG.resolve(key)
 // flattens a preset into the concrete cfg object the game logic consumes.
 //
-// Stage 4 model (Dragonsweeper football):
-//   - stamina = HP (the resource you risk), skill = attack.
-//   - Beating a defender of power P costs max(0, P - skill) stamina and grants +P XP.
-//   - The KEEPER (boss) sits at the goal (top-centre), revealed from the start; beating it WINS.
-//   - Level-up is MANUAL and FULL-HEAL: tap it when you choose -> skill+1, maxStamina+2, full heal.
-//   - Medkit cells restore +MEDKIT_RESTORE stamina (capped at maxStamina) when revealed.
+// Deduction model (classic-minesweeper football):
+//   - The KEEPER sits at the goal (top-centre, row 0), kind 'keeper', power 1, revealed from the
+//     start — it is the GOAL. Reaching/acting on it (once it borders the safe region) WINS.
+//   - Field DEFENDERS (power 1..4) are MINES. A safe cell's NUMBER (pressure) = sum of adjacent
+//     defender powers, including the keeper. Navigate by the numbers to avoid defenders.
+//   - There is a guaranteed connected SAFE path from the kickoff up to the keeper.
+//   - SAVES absorb a defender hit (consume one, the run continues). With no saves left, revealing
+//     a defender is a loss.
+//   - ARTIFACTS on the safe path: 'save' (+1 save) and 'scout' (free safe hint).
 (function (global) {
   "use strict";
 
-  // Stamina restored by picking up a medkit (safe cell). Capped at the player's maxStamina.
-  var MEDKIT_RESTORE = 3;
-
-  // The keeper-boss is the SAME on every difficulty (like Dragonsweeper's dragon). Difficulty
-  // scales through the field: bigger pitch + more defenders + more high-level ones — NOT a tougher
-  // keeper. NOTE: the winnability validator uses a 32-bit mask, so keep
-  // (total field defenders + 1 keeper) <= 31 — i.e. field defenders <= ~30.
-  var KEEPER_POWER = 13;
-
   var PRESETS = {
     easy: {
-      label: "Лёгкий", cols: 8, rows: 12,
-      defenders: { p1: 9, p2: 6, p3: 3, p4: 1 },   // 19 field defenders
-      keeperPower: KEEPER_POWER,
-      start: { skill: 1, stamina: 8 },
-      maxStaminaStart: 8,
-      xpThresholds: [4, 9, 15, 22, 30, 40],
-      medkits: 3,
-      allowSafePath: false,
+      label: "Лёгкий",
+      cols: 10, rows: 15,
+      density: 0.30,
+      powerWeights: { 1: 5, 2: 3, 3: 1, 4: 0 },
+      startSaves: 3,
+      artifacts: { save: 3, scout: 3 },
+      pathWiggle: 0.35,
     },
     normal: {
-      label: "Норма", cols: 9, rows: 14,
-      defenders: { p1: 9, p2: 8, p3: 6, p4: 3 },   // 26 field defenders
-      keeperPower: KEEPER_POWER,
-      start: { skill: 1, stamina: 7 },
-      maxStaminaStart: 7,
-      xpThresholds: [4, 9, 15, 22, 30, 40, 52],
-      medkits: 2,
-      allowSafePath: false,
+      label: "Норма",
+      cols: 10, rows: 15,
+      density: 0.42,
+      powerWeights: { 1: 4, 2: 3, 3: 2, 4: 1 },
+      startSaves: 2,
+      artifacts: { save: 2, scout: 2 },
+      pathWiggle: 0.5,
     },
     hard: {
-      label: "Сложный", cols: 10, rows: 15,
-      defenders: { p1: 6, p2: 8, p3: 9, p4: 6 },   // 29 field defenders, weighted to high tiers
-      keeperPower: KEEPER_POWER,
-      start: { skill: 1, stamina: 6 },
-      maxStaminaStart: 6,
-      xpThresholds: [5, 11, 18, 26, 35, 45, 57, 70],
-      medkits: 1,
-      allowSafePath: false,
+      label: "Сложный",
+      cols: 10, rows: 15,
+      density: 0.55,
+      powerWeights: { 1: 2, 2: 3, 3: 3, 4: 2 },
+      startSaves: 1,
+      artifacts: { save: 1, scout: 2 },
+      pathWiggle: 0.6,
     },
   };
 
@@ -66,15 +57,13 @@
       startCol: Math.floor(cols / 2),
       keeperCol: Math.floor(cols / 2),
       tile: 32,                      // render tile size (32px world)
-      medkitRestore: MEDKIT_RESTORE,
-      maxGenAttempts: 600,
+      maxGenAttempts: 200,
     });
   }
 
   var CONFIG = {
     difficulty: "normal",           // daily board difficulty
     presets: PRESETS,
-    MEDKIT_RESTORE: MEDKIT_RESTORE,
     resolve: resolve,
   };
 

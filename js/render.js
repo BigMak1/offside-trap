@@ -10,7 +10,8 @@
   var SPRITE_NAMES = [
     "tile-hidden", "tile-revealed-empty", "tile-grass-b", "ball", "marker-cone",
     "goal-left", "goal-mid", "goal-right",
-    "defender-1", "defender-2", "defender-3", "defender-4", "keeper", "medkit",
+    "defender-1", "defender-2", "defender-3", "defender-4", "keeper",
+    "artifact-save", "artifact-scout",
     "num-0", "num-1", "num-2", "num-3", "num-4", "num-5", "num-6", "num-7", "num-8", "num-9",
     "particle-spark", "particle-confetti", "particle-ring",
   ];
@@ -100,14 +101,14 @@
   Renderer.prototype.onEvents = function (events, now) {
     var self = this, order = 0;
     events.forEach(function (e) {
-      if (e.type === "reveal" || (e.type === "duel" && e.success) || e.type === "medkit") {
+      if (e.type === "reveal" || e.type === "save") {
         self.reveals[e.idx] = { start: now + order * 20, dur: 170 };
         order++;
       }
-      if (e.type === "medkit") self.spawnBurst(e.idx, PAL.green, 12);
-      else if (e.type === "duel" && !e.success) { self.shakeUntil = now + 380; self.flash = now; self.spawnBurst(e.idx, PAL.red, 14); }
+      if (e.type === "artifact") self.spawnBurst(e.idx, e.kind === "save" ? PAL.gold : PAL.green, 14);
+      else if (e.type === "save") { self.shakeUntil = now + 220; self.spawnBurst(e.idx, PAL.gold, 18); }  // glove save — not a hit
+      else if (e.type === "duel") { self.shakeUntil = now + 380; self.flash = now; self.spawnBurst(e.idx, PAL.red, 14); }
       else if (e.type === "goal") { self.goalFlashUntil = now + 750; self.shakeUntil = now + 450; self.spawnBurst(e.idx, PAL.gold, 34); }
-      else if (e.type === "levelup") self.spawnBurst(self.state.ballIdx, PAL.gold, 18);
       else if (e.type === "gameover") { self.revealAll = true; self.flash = now; self.shakeUntil = now + 500; self.spawnBurst(typeof e.idx === "number" ? e.idx : self.state.ballIdx, PAL.red, 22); }
       else if (e.type === "illegal") self.shakeUntil = now + 160;
     });
@@ -174,6 +175,15 @@
     this.drawNumber(power, r.x, r.y, { backing: numColor || true, anchor: "bottom", small: true });
   };
 
+  // Draw an artifact pickup ('save'|'scout') centred in the cell.
+  Renderer.prototype.drawArtifact = function (kind, r, alpha) {
+    var size = Math.round(TILE * 0.66);
+    var x = r.x + Math.round((TILE - size) / 2), y = r.y + Math.round((TILE - size) / 2);
+    if (alpha != null && alpha < 1) this.ctx.globalAlpha = alpha;
+    this.drawSprite("artifact-" + kind, x, y, size, size);
+    this.ctx.globalAlpha = 1;
+  };
+
   // Revealed grass alternates light/dark by column → mown pitch stripes.
   Renderer.prototype.grassName = function (idx) {
     return (idx % this.cfg.cols) % 2 === 0 ? "tile-revealed-empty" : "tile-grass-b";
@@ -186,15 +196,13 @@
   };
 
   Renderer.prototype.drawCell = function (idx) {
-    var ctx = this.ctx, cell = this.state.board.cells[idx], p = this.state.player, r = this.cellRect(idx);
+    var ctx = this.ctx, cell = this.state.board.cells[idx], r = this.cellRect(idx);
 
-    // KEEPER boss — revealed from the start; sits at the goal.
+    // KEEPER — the goal: revealed from the start, trivial (HP 1). Reaching it wins.
     if (cell.kind === "keeper") {
       if (!cell.beaten) {
         this.drawSprite("tile-hidden", r.x, r.y, TILE, TILE);
-        var cost = cell.power - p.skill;
-        var affordable = cost <= p.stamina;        // cost is >=0 here in practice
-        this.drawToken("keeper", cell.power, r, null, affordable ? PAL.green : PAL.red);
+        this.drawToken("keeper", cell.power, r, null, PAL.gold);
       } else {
         this.drawSprite(this.grassName(idx), r.x, r.y, TILE, TILE);
         ctx.globalAlpha = 0.3; this.drawSprite("keeper", r.x, r.y, TILE, TILE); ctx.globalAlpha = 1;
@@ -211,6 +219,8 @@
       if (cell.marked) this.drawSprite("marker-cone", r.x, r.y, TILE, TILE);
       if (field && (this.showDebug || this.revealAll)) {
         this.drawToken("defender-" + cell.power, cell.power, r, (this.revealAll && !this.showDebug) ? 0.6 : null, true);
+      } else if (cell.artifact && (this.showDebug || this.revealAll)) {
+        this.drawArtifact(cell.artifact, r, 0.7);
       }
       return;
     }
@@ -230,8 +240,8 @@
       this.drawToken("defender-" + (cell.power || 1), cell.power || 1, r, null, PAL.red);
     } else if (field && cell.beaten) {
       this.drawToken("defender-" + cell.power, cell.power, r, 0.62, true);     // beaten: whom you got past
-    } else if (cell.kind === "medkit") {
-      ctx.globalAlpha = 0.45; this.drawSprite("medkit", r.x, r.y, TILE, TILE); ctx.globalAlpha = 1;
+    } else if (cell.artifact) {
+      this.drawArtifact(cell.artifact, r, 1);
     } else if (cell.pressure > 0) {
       this.drawNumber(cell.pressure, r.x, r.y, { backing: true });
     }

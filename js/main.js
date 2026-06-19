@@ -1,4 +1,4 @@
-// Offside Trap — wiring: screens, input, HUD, scouting, manual level-up, loop. (Stage 4)
+// Offside Trap — wiring: screens, input, HUD, scouting, loop. (Deduction redesign)
 (function () {
   "use strict";
 
@@ -26,12 +26,7 @@
     stage: document.getElementById("stage"),
     boardWrap: document.getElementById("board-wrap"),
     scout: document.getElementById("scout"),
-    btnLevel: document.getElementById("btn-level"),
-    skill: document.getElementById("skill-val"),
-    stamina: document.getElementById("stamina-val"),
-    staminaBar: document.getElementById("stamina-bar"),
-    xpBar: document.getElementById("xp-bar"),
-    level: document.getElementById("level-val"),
+    saves: document.getElementById("saves-val"),
     seed: document.getElementById("seed-val"),
     banner: document.getElementById("banner"),
     bannerTitle: document.getElementById("banner-title"),
@@ -60,21 +55,23 @@
   function buildDifficultyCards() {
     el.diffCards.textContent = "";
     Object.keys(CFG.presets).forEach(function (key) {
-      var pr = CFG.presets[key], d = pr.defenders;
-      var total = d.p1 + d.p2 + d.p3 + d.p4;
-      var ranks = [1, 2, 3]; if (d.p4 > 0) ranks.push(4);
-
+      var pr = CFG.presets[key];
       var card = document.createElement("button");
       card.className = "card";
       var defs = document.createElement("div"); defs.className = "card-defs";
-      ranks.forEach(function (rk) { var img = document.createElement("img"); img.src = "assets/defender-" + rk + ".png"; img.alt = ""; defs.appendChild(img); });
-      var k = document.createElement("img"); k.src = "assets/keeper.png"; k.alt = ""; defs.appendChild(k);
+      [1, 2, 3, 4].forEach(function (rk) { var img = document.createElement("img"); img.src = "assets/defender-" + rk + ".png"; img.alt = ""; defs.appendChild(img); });
+      var g = document.createElement("img"); g.src = "assets/artifact-save.png"; g.alt = ""; defs.appendChild(g);
 
       var body = document.createElement("div"); body.className = "card-body";
       var name = document.createElement("div"); name.className = "card-name " + key; name.textContent = diffLabel(key);
       if (key === "normal") { var b = document.createElement("span"); b.className = "card-badge"; b.textContent = t("badge_daily"); name.appendChild(b); }
       var meta = document.createElement("div"); meta.className = "card-meta";
-      meta.textContent = t("card_meta", { cols: pr.cols, rows: pr.rows, n: total, kp: pr.keeperPower, st: pr.start.stamina });
+      meta.textContent = t("card_meta", {
+        cols: pr.cols, rows: pr.rows,
+        dens: Math.round(pr.density * 100),
+        saves: pr.startSaves,
+        art: pr.artifacts.save + pr.artifacts.scout,
+      });
       body.appendChild(name); body.appendChild(meta);
       card.appendChild(defs); card.appendChild(body);
       card.addEventListener("click", function () { startPractice(key); });
@@ -86,13 +83,12 @@
   function buildRules() {
     var rows = [
       ["ball", "rule_goal_t", "rule_goal_d", ""],
-      ["tile-hidden", "rule_move_t", "rule_move_d", ""],
       ["digit-3", "rule_number_t", "rule_number_d", ""],
-      ["defender-2", "rule_def_t", "rule_def_d", ""],
+      ["defender-2", "rule_def_t", "rule_def_d", "lose"],
+      ["artifact-save", "rule_save_t", "rule_save_d", ""],
+      ["artifact-scout", "rule_scout_t", "rule_scout_d", ""],
+      ["marker-cone", "rule_mark_t", "rule_mark_d", ""],
       ["keeper", "rule_keeper_t", "rule_keeper_d", "win"],
-      ["medkit", "rule_medkit_t", "rule_medkit_d", ""],
-      ["icon-skill", "rule_level_t", "rule_level_d", ""],
-      ["icon-stamina", "rule_lose_t", "rule_lose_d", "lose"],
     ];
     el.rulesList.textContent = "";
     rows.forEach(function (r) {
@@ -105,7 +101,7 @@
     });
   }
 
-  // ── DOSSIER: the opposition tab (defender classification + keeper) ──────────
+  // ── DOSSIER: the opposition + artifacts tab ─────────────────────────────────
   function buildSquad() {
     el.squadList.textContent = "";
     var intro = document.createElement("p"); intro.className = "squad-intro"; intro.textContent = t("squad_intro");
@@ -120,8 +116,10 @@
       el.squadList.appendChild(r);
     }
     [1, 2, 3, 4].forEach(function (pw) {
-      row("defender-" + pw, t("squad_def", { p: pw }), t("squad_def_cost"), "sq" + pw);
+      row("defender-" + pw, t("squad_def", { p: pw }), t("squad_def_sub"), "sq" + pw);
     });
+    row("artifact-save", t("squad_save"), t("squad_save_sub"), "art");
+    row("artifact-scout", t("squad_scout"), t("squad_scout_sub"), "art");
     row("keeper", t("squad_keeper"), t("squad_keeper_d"), "keeper");
   }
 
@@ -159,51 +157,29 @@
   }
 
   function updateHUD() {
-    var p = state.player;
-    el.skill.textContent = p.skill;
-    el.stamina.textContent = p.stamina + " / " + p.maxStamina;
-    el.staminaBar.style.width = (100 * p.stamina / Math.max(1, p.maxStamina)) + "%";
-    el.level.textContent = p.level;
-    var next = GAME.xpToNext(state);
-    if (next === null) { el.xpBar.style.width = "100%"; }
-    else {
-      var prev = p.level > 0 ? activeCfg.xpThresholds[p.level - 1] : 0;
-      el.xpBar.style.width = (100 * (p.xp - prev) / (next - prev)) + "%";
-    }
-    refreshLevelBtn();
+    el.saves.textContent = state.saves;
+    el.saves.parentNode.classList.toggle("stat--empty", state.saves <= 0);
     updateScout();
   }
 
-  function refreshLevelBtn() {
-    var can = GAME.canLevelUp(state);
-    el.btnLevel.disabled = !can;
-    el.btnLevel.classList.toggle("ready", can);
-    var pend = state.pendingLevels || 0;
-    el.btnLevel.textContent = t("btn_level") + (pend > 1 ? " (" + pend + ")" : "");
-  }
-
   function updateScout() {
-    var s = GAME.scout(state), p = state.player;
+    var s = GAME.scout(state);
     el.scout.textContent = "";
-    // keeper chip
-    var kchip = document.createElement("div"); kchip.className = "chip chip--keeper";
+    // keeper chip (the goal)
+    var kchip = document.createElement("div"); kchip.className = "chip chip--keeper " + (s.keeperBeaten ? "beaten" : "ok");
     var ki = document.createElement("img"); ki.src = "assets/keeper.png"; ki.alt = "";
-    var kt = document.createElement("span");
-    if (s.keeperBeaten) { kchip.classList.add("beaten"); kt.textContent = "✓"; }
-    else {
-      kt.textContent = s.keeperPower;
-      var cost = s.keeperPower - p.skill;
-      kchip.classList.add(cost <= p.stamina ? "ok" : "danger");
-    }
+    var kt = document.createElement("span"); kt.textContent = s.keeperBeaten ? "✓" : "★";
     kchip.appendChild(ki); kchip.appendChild(kt); el.scout.appendChild(kchip);
-    // remaining defenders by power
-    [1, 2, 3, 4].forEach(function (pw) {
-      var n = s.remaining[pw] || 0; if (!n) return;
+    // defenders remaining (mines left to avoid)
+    chip("defender-4", "×" + s.defendersRemaining);
+    // artifacts still on the board
+    if (s.artifactsLeft > 0) chip("artifact-scout", "×" + s.artifactsLeft);
+    function chip(sprite, text) {
       var c = document.createElement("div"); c.className = "chip";
-      var im = document.createElement("img"); im.src = "assets/defender-" + pw + ".png"; im.alt = "";
-      var tx = document.createElement("span"); tx.textContent = "×" + n;
+      var im = document.createElement("img"); im.src = "assets/" + sprite + ".png"; im.alt = "";
+      var tx = document.createElement("span"); tx.textContent = text;
       c.appendChild(im); c.appendChild(tx); el.scout.appendChild(c);
-    });
+    }
   }
 
   function popup(idx, text, cls) {
@@ -217,16 +193,12 @@
   // Pick ONE chiptune cue per event batch (priority order) so cascades don't spam sound.
   function sfxForEvents(events) {
     if (!window.OT_SFX) return;
-    var has = {}, duelWin = false;
-    for (var i = 0; i < events.length; i++) {
-      has[events[i].type] = true;
-      if (events[i].type === "duel" && events[i].success) duelWin = true;
-    }
+    var has = {};
+    for (var i = 0; i < events.length; i++) has[events[i].type] = true;
     if (has.goal) OT_SFX.play("goal");
     else if (has.gameover) OT_SFX.play("lose");
-    else if (has.levelup) OT_SFX.play("levelup");
-    else if (has.medkit) OT_SFX.play("medkit");
-    else if (duelWin) OT_SFX.play("tackle");
+    else if (has.save) OT_SFX.play("tackle");
+    else if (has.artifact) OT_SFX.play("medkit");
     else if (has.mark) OT_SFX.play("mark");
     else if (has.reveal) OT_SFX.play("reveal");
     else if (has.illegal || has.blocked) OT_SFX.play("deny");
@@ -236,18 +208,15 @@
     sfxForEvents(events);
     renderer.onEvents(events, performance.now());
     events.forEach(function (e) {
-      if (e.type === "duel" && e.success) {
-        popup(e.idx, "+" + e.power + " XP", "xp");
-        if (e.cost > 0) popup(e.idx, "-" + e.cost, "cost");
-      } else if (e.type === "medkit") {
-        popup(e.idx, "+" + e.restored, "heal");
-      } else if (e.type === "levelup") {
-        popup(state.ballIdx, t("pop_skill"), "level");
+      if (e.type === "artifact") {
+        if (e.kind === "save") popup(e.idx, "+🧤", "heal");
+        else popup(e.idx, "👁", "level");
+      } else if (e.type === "save") {
+        popup(e.idx, t("pop_save"), "save");
       } else if (e.type === "goal") {
         showBanner("banner_goal_t", "banner_goal_s", {});
       } else if (e.type === "gameover") {
-        if (e.reason === "stranded") showBanner("banner_lost_t", "lost_stranded", { st: e.stamina });
-        else showBanner("banner_lost_t", "lost_tackle", { p: e.power, c: e.cost, st: e.stamina });
+        showBanner("banner_lost_t", "lost_caught", { p: e.power });
       }
     });
     updateHUD();
@@ -312,7 +281,6 @@
   el.guideTabs.addEventListener("click", function (ev) {
     var tb = ev.target.closest(".guide-tab"); if (tb) showGuideTab(tb.getAttribute("data-tab"));
   });
-  el.btnLevel.addEventListener("click", function () { if (GAME.canLevelUp(state)) reactToEvents(GAME.levelUp(state)); });
   el.btnMark.addEventListener("click", function () { markMode = !markMode; el.btnMark.classList.toggle("active", markMode); el.btnMark.setAttribute("aria-pressed", markMode); });
   el.btnCrt.addEventListener("click", function () { var on = el.stage.classList.toggle("crt"); el.btnCrt.classList.toggle("active", on); el.btnCrt.setAttribute("aria-pressed", on); });
   el.btnDebug.addEventListener("click", function () { renderer.showDebug = !renderer.showDebug; el.btnDebug.classList.toggle("active", renderer.showDebug); el.btnDebug.setAttribute("aria-pressed", renderer.showDebug); });
@@ -329,8 +297,8 @@
     if (window.OT_SFX) OT_SFX.ensure();
     if (audioStarted || muted) return;
     audioStarted = true;
-    var p = ambience.play();
-    if (p && p.catch) p.catch(function () { audioStarted = false; });
+    var pr = ambience.play();
+    if (pr && pr.catch) pr.catch(function () { audioStarted = false; });
   }
   document.addEventListener("pointerdown", startAudio);
   function refreshSoundBtn() {
@@ -382,7 +350,6 @@
     get state() { return state; }, get renderer() { return renderer; },
     reveal: function (idx) { reactToEvents(GAME.revealCell(state, idx, {})); },
     mark: function (idx) { reactToEvents(GAME.toggleMark(state, idx)); },
-    levelUp: function () { reactToEvents(GAME.levelUp(state)); },
     newGame: newGame,
   };
 

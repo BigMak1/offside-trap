@@ -15,7 +15,7 @@
   --red:   #E5484D;
   --orange:#FF8C2B;
   --gold:  #FFE14D;
-  --font: 'Pixelify Sans', ui-monospace, monospace;
+  --font: 'Silkscreen', 'Pixelify Sans', ui-monospace, monospace;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }

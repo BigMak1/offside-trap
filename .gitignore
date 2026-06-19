@@ -10,6 +10,11 @@ node_modules/
 .playwright-mcp/
 assets/_build/_*.png
 
+# Large input media dropped in the task folder — not part of the shipped game
+.ai/*.mp3
+.ai/*.wav
+.ai/*.ogg
+
 # Temp scratch & screenshots (keep the repo clean for agents reading it)
 /*.png
 ot-*.png

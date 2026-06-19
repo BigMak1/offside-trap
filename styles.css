@@ -2,19 +2,20 @@
    (mirrors the sprite palette). Everything blocky: hard edges, stepped bevels,
    pixel bitmap font, no smooth gradients/rounded chrome. */
 :root {
-  --ink:   #0B1322;
-  --navy:  #15233B;
-  --steel: #243B59;
-  --slate: #3E5C7E;
-  --pitch: #123A24;
-  --grass: #1C5C34;
-  --grass2:#2E8F4E;
-  --grass3:#4FBE6C;
-  --grey:  #AEBFCF;
-  --white: #F3F1E2;
-  --red:   #E5484D;
+  /* Sunny-arcade stadium: warm grass-green chrome framing the bright pitch. */
+  --ink:   #0A1A10;
+  --navy:  #123524;
+  --steel: #1F5237;
+  --slate: #36815A;
+  --pitch: #1B5E33;
+  --grass: #2E8F4E;
+  --grass2:#49BD10;
+  --grass3:#7BD42E;
+  --grey:  #BCD6C2;
+  --white: #F4F6EA;
+  --red:   #FF4D52;
   --orange:#FF8C2B;
-  --gold:  #FFE14D;
+  --gold:  #FFD23F;
   --font: 'Silkscreen', 'Pixelify Sans', ui-monospace, monospace;
 }
 
@@ -24,8 +25,8 @@ html, body {
   margin: 0;
   min-height: 100%;
   background:
-    repeating-linear-gradient(0deg, rgba(255,255,255,0.012) 0 2px, transparent 2px 4px),
-    radial-gradient(130% 80% at 50% -10%, #1c3350 0%, var(--ink) 58%, #05080f 100%);
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.015) 0 2px, transparent 2px 4px),
+    radial-gradient(125% 85% at 50% -12%, #3C9A63 0%, #134024 48%, #08180E 100%);
   color: var(--white);
   font-family: var(--font);
   font-weight: 400;
@@ -300,3 +301,51 @@ canvas#game {
 @keyframes levelpulse { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.18); } }
 
 .popup.heal { color: var(--grass3); }
+
+/* ── DOSSIER guidebook: tabs + opposition list ───────────────────────────── */
+.guide-tabs { display: flex; gap: 8px; margin: 0 0 14px; }
+.guide-tab {
+  flex: 1; font-family: var(--font); font-weight: 700; font-size: 13px; letter-spacing: 1px;
+  color: var(--grey); background: var(--navy); border: 3px solid var(--ink); cursor: pointer;
+  padding: 10px 8px; box-shadow: inset 2px 2px 0 0 var(--steel), inset -2px -2px 0 0 #08130c;
+}
+.guide-tab.active {
+  color: var(--ink); background: var(--gold);
+  box-shadow: inset 2px 2px 0 0 #fff2a8, inset -2px -2px 0 0 var(--orange);
+}
+.squad { text-align: left; margin: 0 0 18px; }
+.squad-intro { font-size: 13px; color: var(--grey); line-height: 1.6; margin: 0 0 12px; }
+.squad-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 0; border-bottom: 2px solid var(--steel);
+}
+.squad-row:last-child { border-bottom: none; }
+.squad-row img { width: 40px; height: 40px; flex: 0 0 40px; image-rendering: pixelated; }
+.squad-txt { display: flex; flex-direction: column; gap: 1px; }
+.squad-txt b { font-size: 15px; color: var(--white); }
+.squad-txt span { font-size: 12px; color: var(--grey); }
+.squad-row.sq1 b { color: #57C7DE; }
+.squad-row.sq2 b { color: var(--gold); }
+.squad-row.sq3 b { color: var(--orange); }
+.squad-row.sq4 b { color: var(--red); }
+.squad-row.keeper b { color: #BB8CFF; }
+
+/* ── desktop: board on the left, controls in a sidebar ───────────────────── */
+@media (min-width: 900px) {
+  .app { max-width: 1040px; padding: 18px 18px 30px; }
+  #screen-game.active {
+    display: grid;
+    grid-template-columns: auto 330px;
+    grid-auto-rows: min-content;
+    gap: 12px 22px;
+    align-content: start;
+    justify-content: center;
+  }
+  #screen-game .topbar { grid-column: 1 / -1; }
+  #screen-game .stage { grid-column: 1; grid-row: 2 / 7; align-self: start; justify-self: center; }
+  #screen-game .hud { grid-column: 2; grid-row: 2; }
+  #screen-game .actbar { grid-column: 2; grid-row: 3; }
+  #screen-game .controls { grid-column: 2; grid-row: 4; justify-content: flex-start; }
+  #screen-game .hint { grid-column: 2; grid-row: 5; margin: 0; text-align: left; max-width: none; }
+  #screen-game .hud { flex-wrap: wrap; }
+}

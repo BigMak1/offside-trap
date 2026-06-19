@@ -118,7 +118,7 @@
       el.squadList.appendChild(r);
     }
     [1, 2, 3, 4].forEach(function (pw) {
-      row("defender-" + pw, t("squad_def", { p: pw }), t("squad_def_cost"));
+      row("defender-" + pw, t("squad_def", { p: pw }), t("squad_def_cost"), "sq" + pw);
     });
     row("keeper", t("squad_keeper"), t("squad_keeper_d"), "keeper");
   }

@@ -8,7 +8,7 @@
       // title / nav
       menu_play: "▶ PLAY",
       menu_difficulty: "DIFFICULTY",
-      menu_guide: "DOSSIER",
+      menu_guide: "PLAYBOOK",
       tagline: "daily challenge · football minesweeper",
       diff_title: "DIFFICULTY",
       back: "◄ BACK",
@@ -19,7 +19,7 @@
       // controls
       ctrl_mark: "🚩 CONE",
       ctrl_replay: "↻ RESET",
-      ctrl_guide: "? DOSSIER",
+      ctrl_guide: "? PLAYBOOK",
       ctrl_crt: "📺 CRT",
       ctrl_debug: "👁 DEBUG",
       ctrl_sound: "SOUND",
@@ -40,7 +40,7 @@
       lost_caught: "You ran into a power-{p} defender. Read the numbers!",
       err_sprites: "Failed to load sprites: {msg}",
       // guide / dossier
-      guide_title: "DOSSIER",
+      guide_title: "PLAYBOOK",
       guide_ok: "GOT IT ▶",
       guide_tab_rules: "HOW TO PLAY",
       guide_tab_squad: "THE PITCH",
@@ -60,7 +60,7 @@
     ru: {
       menu_play: "▶ ИГРАТЬ",
       menu_difficulty: "СЛОЖНОСТЬ",
-      menu_guide: "ДОСЬЕ",
+      menu_guide: "ТАКТИКА",
       tagline: "ежедневный челлендж · футбольный сапёр",
       diff_title: "СЛОЖНОСТЬ",
       back: "◄ НАЗАД",
@@ -69,7 +69,7 @@
       hud_saves: "Сейвы",
       ctrl_mark: "🚩 КОНУС",
       ctrl_replay: "↻ ЗАНОВО",
-      ctrl_guide: "? ДОСЬЕ",
+      ctrl_guide: "? ТАКТИКА",
       ctrl_crt: "📺 CRT",
       ctrl_debug: "👁 DEBUG",
       ctrl_sound: "ЗВУК",
@@ -86,7 +86,7 @@
       banner_lost_t: "ПОЙМАН!",
       lost_caught: "Налетел на защитника силы {p}. Читай числа!",
       err_sprites: "Не удалось загрузить спрайты: {msg}",
-      guide_title: "ДОСЬЕ",
+      guide_title: "ТАКТИКА",
       guide_ok: "ПОНЯТНО ▶",
       guide_tab_rules: "КАК ИГРАТЬ",
       guide_tab_squad: "ПОЛЕ",

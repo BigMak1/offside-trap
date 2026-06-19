@@ -18,6 +18,9 @@
   --gold:  #FFD23F;
   --font: 'Silkscreen', 'Pixelify Sans', ui-monospace, monospace;
 }
+/* Russian: DotGothic16 has clean Cyrillic (Silkscreen has none), so RU no longer mixes fonts. */
+html[lang="ru"] { --font: 'DotGothic16', 'Pixelify Sans', ui-monospace, monospace; }
+html[lang="ru"] body { letter-spacing: 0; }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 

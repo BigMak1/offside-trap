@@ -295,7 +295,8 @@
   // already unlocked (you clicked PLAY), so the crowd plays immediately — no cell tap required.
   var muted = localStorage.getItem("ot_muted") === "1";
   if (window.OT_SFX) OT_SFX.setMuted(muted);
-  document.addEventListener("pointerdown", function () { if (window.OT_SFX) OT_SFX.ensure(); });
+  function unlockAudio() { if (window.OT_SFX) OT_SFX.ensure(); }
+  ["pointerdown", "keydown", "touchstart"].forEach(function (ev) { document.addEventListener(ev, unlockAudio, { passive: true }); });
   function refreshSoundBtn() {
     var btns = document.querySelectorAll(".sound-toggle");
     for (var i = 0; i < btns.length; i++) {
@@ -357,6 +358,7 @@
     if (debugStart) el.btnDebug.classList.add("active");
     requestAnimationFrame(loop);
     if (debugStart || diffParam || dayOverride) startDaily(); else showScreen("title");
+    if (window.OT_SFX) OT_SFX.ensure();   // attempt to start music on load (plays where autoplay is allowed)
   }).catch(function (err) {
     var p = document.createElement("p"); p.style.cssText = "color:#E5484D;padding:1rem;font-family:monospace";
     p.textContent = t("err_sprites", { msg: err.message }); document.body.appendChild(p);

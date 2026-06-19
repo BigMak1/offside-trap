@@ -59,7 +59,7 @@
       startRow: rows - 1,            // bottom = kickoff
       startCol: Math.floor(cols / 2),
       keeperCol: Math.floor(cols / 2),
-      tile: 16,                      // render tile size
+      tile: 32,                      // render tile size (32px world)
       medkitRestore: MEDKIT_RESTORE,
       maxGenAttempts: 600,
     });

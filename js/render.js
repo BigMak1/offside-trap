@@ -3,7 +3,7 @@
 (function (global) {
   "use strict";
 
-  var TILE = 16;
+  var TILE = 32;            // 32px world (PixelLab sprites are native 32; 16px sprites scale ×2 at draw time)
   var GOAL_BAND = TILE;
   var PAL = { gold: "#FFE14D", white: "#F3F1E2", red: "#E5484D", ink: "#0B1322", green: "#4FBE6C" };
 
@@ -14,7 +14,7 @@
     "num-0", "num-1", "num-2", "num-3", "num-4", "num-5", "num-6", "num-7", "num-8", "num-9",
     "particle-spark", "particle-confetti", "particle-ring",
   ];
-  var NUM_W = 5, NUM_H = 7, NUM_GAP = 1;
+  var NUM_W = 10, NUM_H = 14, NUM_GAP = 2;   // digit glyphs scale ×2 with the 32px tile
 
   function loadSprites(basePath) {
     basePath = basePath || "assets/";
@@ -118,9 +118,13 @@
   };
 
   // ── drawing ──────────────────────────────────────────────────────────────────
-  Renderer.prototype.drawSprite = function (name, x, y) {
+  // Draw a sprite. With w/h given, scale to that box (nearest-neighbour, since
+  // imageSmoothingEnabled=false) — lets 16px sprites fill a 32px tile crisply.
+  Renderer.prototype.drawSprite = function (name, x, y, w, h) {
     var img = this.sprites[name];
-    if (img) this.ctx.drawImage(img, Math.round(x), Math.round(y));
+    if (!img) return;
+    if (w) this.ctx.drawImage(img, Math.round(x), Math.round(y), w, h);
+    else this.ctx.drawImage(img, Math.round(x), Math.round(y));
   };
 
   // Composite a multi-digit number, centred in a TILE box at (bx,by), over a backing pill.
@@ -135,15 +139,15 @@
       ctx.globalAlpha = 1;
     }
     for (var i = 0; i < s.length; i++) {
-      this.drawSprite("num-" + s[i], x, y);
+      this.drawSprite("num-" + s[i], x, y, NUM_W, NUM_H);
       x += NUM_W + NUM_GAP;
     }
   };
 
   Renderer.prototype.drawGoalFrame = function () {
-    this.drawSprite("goal-left", 0, 0);
-    for (var c = 1; c < this.cfg.cols - 1; c++) this.drawSprite("goal-mid", c * TILE, 0);
-    this.drawSprite("goal-right", (this.cfg.cols - 1) * TILE, 0);
+    this.drawSprite("goal-left", 0, 0, TILE, TILE);
+    for (var c = 1; c < this.cfg.cols - 1; c++) this.drawSprite("goal-mid", c * TILE, 0, TILE, TILE);
+    this.drawSprite("goal-right", (this.cfg.cols - 1) * TILE, 0, TILE, TILE);
   };
 
   Renderer.prototype.drawCell = function (idx) {
@@ -152,14 +156,14 @@
     // KEEPER boss — revealed from the start; sits at the goal.
     if (cell.kind === "keeper") {
       if (!cell.beaten) {
-        this.drawSprite("tile-hidden", r.x, r.y);
-        this.drawSprite("keeper", r.x, r.y);
+        this.drawSprite("tile-hidden", r.x, r.y, TILE, TILE);
+        this.drawSprite("keeper", r.x, r.y, TILE, TILE);
         var cost = cell.power - p.skill;
         var affordable = cost <= p.stamina;        // cost is >=0 here in practice
         this.drawNumber(cell.power, r.x, r.y, affordable ? PAL.green : PAL.red);
       } else {
-        this.drawSprite("tile-revealed-empty", r.x, r.y);
-        ctx.globalAlpha = 0.3; this.drawSprite("keeper", r.x, r.y); ctx.globalAlpha = 1;
+        this.drawSprite("tile-revealed-empty", r.x, r.y, TILE, TILE);
+        ctx.globalAlpha = 0.3; this.drawSprite("keeper", r.x, r.y, TILE, TILE); ctx.globalAlpha = 1;
       }
       return;
     }
@@ -169,13 +173,13 @@
     var field = cell.kind === "field" && cell.power > 0;
 
     if (!cell.revealed || (anim && this.now < anim.start)) {
-      this.drawSprite("tile-hidden", r.x, r.y);
-      if (cell.marked) this.drawSprite("marker-cone", r.x, r.y);
+      this.drawSprite("tile-hidden", r.x, r.y, TILE, TILE);
+      if (cell.marked) this.drawSprite("marker-cone", r.x, r.y, TILE, TILE);
       if (field && (this.showDebug || this.revealAll)) {
         if (this.revealAll && !this.showDebug) ctx.globalAlpha = 0.6;
-        this.drawSprite("defender-" + cell.power, r.x, r.y);
+        this.drawSprite("defender-" + cell.power, r.x, r.y, TILE, TILE);
         ctx.globalAlpha = 1;
-        this.drawNumber(cell.power, r.x, r.y, true, 3);   // show its HP cost
+        this.drawNumber(cell.power, r.x, r.y, true, 6);   // show its HP cost
       }
       return;
     }
@@ -190,14 +194,14 @@
     ctx.save();
     ctx.beginPath(); ctx.rect(r.x, top, TILE, h); ctx.clip();
 
-    this.drawSprite("tile-revealed-empty", r.x, r.y);
+    this.drawSprite("tile-revealed-empty", r.x, r.y, TILE, TILE);
     if (cell.lost) {
-      this.drawSprite("defender-" + (cell.power || 1), r.x, r.y);
+      this.drawSprite("defender-" + (cell.power || 1), r.x, r.y, TILE, TILE);
     } else if (field && cell.beaten) {
-      ctx.globalAlpha = 0.62; this.drawSprite("defender-" + cell.power, r.x, r.y); ctx.globalAlpha = 1;
-      this.drawNumber(cell.power, r.x, r.y, true, 3);     // beaten: show whom you got past
+      ctx.globalAlpha = 0.62; this.drawSprite("defender-" + cell.power, r.x, r.y, TILE, TILE); ctx.globalAlpha = 1;
+      this.drawNumber(cell.power, r.x, r.y, true, 6);     // beaten: show whom you got past
     } else if (cell.kind === "medkit") {
-      ctx.globalAlpha = 0.45; this.drawSprite("medkit", r.x, r.y); ctx.globalAlpha = 1;
+      ctx.globalAlpha = 0.45; this.drawSprite("medkit", r.x, r.y, TILE, TILE); ctx.globalAlpha = 1;
     } else if (cell.pressure > 0) {
       this.drawNumber(cell.pressure, r.x, r.y, true);
     }
@@ -228,7 +232,7 @@
       if (age > pt.life) continue;
       var dt = age / 16, px = pt.x + pt.vx * dt, py = pt.y + pt.vy * dt + 0.012 * dt * dt;
       ctx.globalAlpha = Math.max(0, 1 - age / pt.life);
-      this.drawSprite(pt.sprite, px - 4, py - 4);
+      this.drawSprite(pt.sprite, px - 8, py - 8, 16, 16);
       keep.push(pt);
     }
     ctx.globalAlpha = 1;
@@ -270,12 +274,12 @@
 
     // ball — only shown in transit so it never hides the cell it lands on
     var target = this.cellCenter(st.ballIdx);
-    if (st.status === "won") target = { x: this.cellCenter(st.ballIdx).x, y: 8 };
+    if (st.status === "won") target = { x: this.cellCenter(st.ballIdx).x, y: GOAL_BAND / 2 };
     this.ballPos.x += (target.x - this.ballPos.x) * 0.25;
     this.ballPos.y += (target.y - this.ballPos.y) * 0.25;
     var moving = Math.abs(target.x - this.ballPos.x) + Math.abs(target.y - this.ballPos.y) > 1.5;
     if (moving || st.status === "won") {
-      this.drawSprite("ball", Math.round(this.ballPos.x - 8), Math.round(this.ballPos.y - 8));
+      this.drawSprite("ball", Math.round(this.ballPos.x - TILE / 2), Math.round(this.ballPos.y - TILE / 2), TILE, TILE);
     } else if (st.status === "playing") {
       this.drawGlow(st.ballIdx, PAL.white, 0.5);   // settled: mark position without covering content
     }

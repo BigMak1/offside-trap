@@ -103,6 +103,9 @@ def main():
     elif cmd == "one":
         _, _, out, w, h, desc = sys.argv[:6]
         gen_pixflux(out, int(w), int(h), desc)
+    elif cmd == "scene":   # like `one` but keeps the generated background (mood/style refs)
+        _, _, out, w, h, desc = sys.argv[:6]
+        gen_pixflux(out, int(w), int(h), desc, no_background=False)
     else:
         raise SystemExit("unknown cmd %r" % cmd)
 

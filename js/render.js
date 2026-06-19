@@ -8,7 +8,7 @@
   var PAL = { gold: "#FFE14D", white: "#F3F1E2", red: "#E5484D", ink: "#0B1322", green: "#4FBE6C" };
 
   var SPRITE_NAMES = [
-    "tile-hidden", "tile-revealed-empty", "ball", "marker-cone",
+    "tile-hidden", "tile-revealed-empty", "tile-grass-b", "ball", "marker-cone",
     "goal-left", "goal-mid", "goal-right",
     "defender-1", "defender-2", "defender-3", "defender-4", "keeper", "medkit",
     "num-0", "num-1", "num-2", "num-3", "num-4", "num-5", "num-6", "num-7", "num-8", "num-9",
@@ -127,11 +127,20 @@
     else this.ctx.drawImage(img, Math.round(x), Math.round(y));
   };
 
-  // Composite a multi-digit number, centred in a TILE box at (bx,by), over a backing pill.
-  Renderer.prototype.drawNumber = function (n, bx, by, backing, dy) {
+  // Composite a multi-digit number in a TILE box at (bx,by), over a backing pill.
+  // opts.backing: true (dark pill) | colour string (coloured pill) | falsy (none).
+  // opts.anchor === "bottom" pins it to the cell's bottom edge (Dragonsweeper-style HP
+  // badge, so the character above stays visible); otherwise it is vertically centred
+  // (+ opts.dy nudge) — used for pressure numbers on empty cells.
+  Renderer.prototype.drawNumber = function (n, bx, by, opts) {
+    opts = opts || {};
     var ctx = this.ctx, s = "" + n;
     var w = s.length * NUM_W + (s.length - 1) * NUM_GAP;
-    var x = Math.round(bx + (TILE - w) / 2), y = Math.round(by + (TILE - NUM_H) / 2) + (dy || 0);
+    var x = Math.round(bx + (TILE - w) / 2);
+    var y = opts.anchor === "bottom"
+      ? by + TILE - NUM_H - 1
+      : Math.round(by + (TILE - NUM_H) / 2) + (opts.dy || 0);
+    var backing = opts.backing;
     if (backing) {
       ctx.globalAlpha = backing === true ? 0.5 : 0.85;
       ctx.fillStyle = backing === true ? PAL.ink : backing;
@@ -142,6 +151,11 @@
       this.drawSprite("num-" + s[i], x, y, NUM_W, NUM_H);
       x += NUM_W + NUM_GAP;
     }
+  };
+
+  // Revealed grass alternates light/dark by column → mown pitch stripes.
+  Renderer.prototype.grassName = function (idx) {
+    return (idx % this.cfg.cols) % 2 === 0 ? "tile-revealed-empty" : "tile-grass-b";
   };
 
   Renderer.prototype.drawGoalFrame = function () {
@@ -160,9 +174,9 @@
         this.drawSprite("keeper", r.x, r.y, TILE, TILE);
         var cost = cell.power - p.skill;
         var affordable = cost <= p.stamina;        // cost is >=0 here in practice
-        this.drawNumber(cell.power, r.x, r.y, affordable ? PAL.green : PAL.red);
+        this.drawNumber(cell.power, r.x, r.y, { backing: affordable ? PAL.green : PAL.red, anchor: "bottom" });
       } else {
-        this.drawSprite("tile-revealed-empty", r.x, r.y, TILE, TILE);
+        this.drawSprite(this.grassName(idx), r.x, r.y, TILE, TILE);
         ctx.globalAlpha = 0.3; this.drawSprite("keeper", r.x, r.y, TILE, TILE); ctx.globalAlpha = 1;
       }
       return;
@@ -179,7 +193,7 @@
         if (this.revealAll && !this.showDebug) ctx.globalAlpha = 0.6;
         this.drawSprite("defender-" + cell.power, r.x, r.y, TILE, TILE);
         ctx.globalAlpha = 1;
-        this.drawNumber(cell.power, r.x, r.y, true, 6);   // show its HP cost
+        this.drawNumber(cell.power, r.x, r.y, { backing: true, anchor: "bottom" });   // HP cost badge
       }
       return;
     }
@@ -194,16 +208,16 @@
     ctx.save();
     ctx.beginPath(); ctx.rect(r.x, top, TILE, h); ctx.clip();
 
-    this.drawSprite("tile-revealed-empty", r.x, r.y, TILE, TILE);
+    this.drawSprite(this.grassName(idx), r.x, r.y, TILE, TILE);
     if (cell.lost) {
       this.drawSprite("defender-" + (cell.power || 1), r.x, r.y, TILE, TILE);
     } else if (field && cell.beaten) {
       ctx.globalAlpha = 0.62; this.drawSprite("defender-" + cell.power, r.x, r.y, TILE, TILE); ctx.globalAlpha = 1;
-      this.drawNumber(cell.power, r.x, r.y, true, 6);     // beaten: show whom you got past
+      this.drawNumber(cell.power, r.x, r.y, { backing: true, anchor: "bottom" });     // beaten: whom you got past
     } else if (cell.kind === "medkit") {
       ctx.globalAlpha = 0.45; this.drawSprite("medkit", r.x, r.y, TILE, TILE); ctx.globalAlpha = 1;
     } else if (cell.pressure > 0) {
-      this.drawNumber(cell.pressure, r.x, r.y, true);
+      this.drawNumber(cell.pressure, r.x, r.y, { backing: true });
     }
     ctx.restore();
 

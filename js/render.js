@@ -124,10 +124,10 @@
   };
 
   // Composite a multi-digit number, centred in a TILE box at (bx,by), over a backing pill.
-  Renderer.prototype.drawNumber = function (n, bx, by, backing) {
+  Renderer.prototype.drawNumber = function (n, bx, by, backing, dy) {
     var ctx = this.ctx, s = "" + n;
     var w = s.length * NUM_W + (s.length - 1) * NUM_GAP;
-    var x = Math.round(bx + (TILE - w) / 2), y = Math.round(by + (TILE - NUM_H) / 2);
+    var x = Math.round(bx + (TILE - w) / 2), y = Math.round(by + (TILE - NUM_H) / 2) + (dy || 0);
     if (backing) {
       ctx.globalAlpha = backing === true ? 0.5 : 0.85;
       ctx.fillStyle = backing === true ? PAL.ink : backing;
@@ -172,9 +172,10 @@
       this.drawSprite("tile-hidden", r.x, r.y);
       if (cell.marked) this.drawSprite("marker-cone", r.x, r.y);
       if (field && (this.showDebug || this.revealAll)) {
-        if (this.revealAll && !this.showDebug) ctx.globalAlpha = 0.55;
+        if (this.revealAll && !this.showDebug) ctx.globalAlpha = 0.6;
         this.drawSprite("defender-" + cell.power, r.x, r.y);
         ctx.globalAlpha = 1;
+        this.drawNumber(cell.power, r.x, r.y, true, 3);   // show its HP cost
       }
       return;
     }
@@ -193,7 +194,8 @@
     if (cell.lost) {
       this.drawSprite("defender-" + (cell.power || 1), r.x, r.y);
     } else if (field && cell.beaten) {
-      ctx.globalAlpha = 0.32; this.drawSprite("defender-" + cell.power, r.x, r.y); ctx.globalAlpha = 1;
+      ctx.globalAlpha = 0.62; this.drawSprite("defender-" + cell.power, r.x, r.y); ctx.globalAlpha = 1;
+      this.drawNumber(cell.power, r.x, r.y, true, 3);     // beaten: show whom you got past
     } else if (cell.kind === "medkit") {
       ctx.globalAlpha = 0.45; this.drawSprite("medkit", r.x, r.y); ctx.globalAlpha = 1;
     } else if (cell.pressure > 0) {

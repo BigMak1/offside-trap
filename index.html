@@ -23,7 +23,10 @@
         <button class="px-btn px-btn--big" data-act="play" data-i18n="menu_play">▶ PLAY</button>
         <button class="px-btn" data-act="difficulty" data-i18n="menu_difficulty">DIFFICULTY</button>
         <button class="px-btn" data-act="rules" data-i18n="menu_guide">DOSSIER</button>
-        <button class="px-btn px-btn--ghost lang-toggle" data-act="lang" title="Language">RU</button>
+        <div class="menu-toggles">
+          <button class="px-btn px-btn--ghost lang-toggle" data-act="lang" title="Language">RU</button>
+          <button class="px-btn px-btn--ghost sound-toggle" data-act="sound" title="Sound">🔊 SOUND</button>
+        </div>
       </nav>
       <p class="tagline" data-i18n="tagline">daily challenge · football minesweeper</p>
     </section>
@@ -74,7 +77,7 @@
         <button class="px-btn" data-act="rules" data-i18n="ctrl_guide" title="Dossier">? DOSSIER</button>
         <button class="px-btn" id="btn-crt" aria-pressed="false" data-i18n="ctrl_crt" title="CRT overlay">📺 CRT</button>
         <button class="px-btn" id="btn-debug" aria-pressed="false" data-i18n="ctrl_debug" title="Reveal board">👁 DEBUG</button>
-        <button class="px-btn" id="btn-sound" aria-pressed="false" title="Sound">🔊 SOUND</button>
+        <button class="px-btn sound-toggle" data-act="sound" aria-pressed="false" title="Sound">🔊 SOUND</button>
         <button class="px-btn px-btn--ghost lang-toggle" data-act="lang" title="Language">RU</button>
       </div>
 

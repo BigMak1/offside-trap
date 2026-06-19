@@ -37,15 +37,17 @@
     btnReplay: document.getElementById("btn-replay"),
     btnCrt: document.getElementById("btn-crt"),
     btnDebug: document.getElementById("btn-debug"),
-    btnSound: document.getElementById("btn-sound"),
   };
 
   var renderer, state, markMode = false;
   var difficulty = "normal", seedKey, activeCfg = CFG.resolve("normal");
   var lastBanner = null;   // {tk, sk, vars} so an open banner can re-localize on language switch
 
+  var MENU_MUSIC = "assets/audio/menu-music.mp3", CROWD = "assets/audio/stadium-ambience.mp3";
+
   function showScreen(name) {
     Object.keys(el.screens).forEach(function (k) { el.screens[k].classList.toggle("active", k === name); });
+    if (window.OT_SFX) OT_SFX.music(name === "game" ? CROWD : MENU_MUSIC);
     if (name === "game") requestAnimationFrame(resize);
   }
   function showRules(on) { el.rulesOverlay.classList.toggle("show", on); }
@@ -137,7 +139,7 @@
     state = GAME.createGame(seedKey, activeCfg);
     renderer.setState(state);
     renderer.showDebug = debugStart;
-    renderer.reveals = {}; renderer.particles = [];
+    renderer.reveals = {}; renderer.particles = []; renderer.pickups = [];
     renderer.onEvents(state.initialEvents, performance.now());
     lastBanner = null; hideBanner(); updateHUD();
     el.seed.textContent = seedLabel() + " · " + diffLabel(difficulty);
@@ -276,6 +278,7 @@
       case "close-rules": showRules(false); break;
       case "to-title": hideBanner(); showScreen("title"); break;
       case "lang": I.toggle(); break;
+      case "sound": toggleMute(); break;
     }
   });
   el.guideTabs.addEventListener("click", function (ev) {
@@ -287,32 +290,27 @@
   el.btnReplay.addEventListener("click", function () { newGame(difficulty, seedKey); });
   el.bannerAgain.addEventListener("click", function () { newGame(difficulty, seedKey); });
 
-  // ── stadium ambience: starts on first user gesture (autoplay policy); mute persists ──
+  // ── audio: menu music vs crowd ambience (gap-less loop via OT_SFX / Web Audio). One mute for all.
+  // Music starts on the first user gesture (autoplay policy). On the game screen the context is
+  // already unlocked (you clicked PLAY), so the crowd plays immediately — no cell tap required.
   var muted = localStorage.getItem("ot_muted") === "1";
   if (window.OT_SFX) OT_SFX.setMuted(muted);
-  var ambience = new Audio("assets/audio/stadium-ambience.mp3");
-  ambience.loop = true; ambience.volume = 0.35; ambience.preload = "auto";
-  var audioStarted = false;
-  function startAudio() {
-    if (window.OT_SFX) OT_SFX.ensure();
-    if (audioStarted || muted) return;
-    audioStarted = true;
-    var pr = ambience.play();
-    if (pr && pr.catch) pr.catch(function () { audioStarted = false; });
-  }
-  document.addEventListener("pointerdown", startAudio);
+  document.addEventListener("pointerdown", function () { if (window.OT_SFX) OT_SFX.ensure(); });
   function refreshSoundBtn() {
-    el.btnSound.classList.toggle("active", !muted);
-    el.btnSound.setAttribute("aria-pressed", String(!muted));
-    el.btnSound.textContent = (muted ? "🔇 " : "🔊 ") + t("ctrl_sound");
+    var btns = document.querySelectorAll(".sound-toggle");
+    for (var i = 0; i < btns.length; i++) {
+      var b = btns[i];
+      b.classList.toggle("active", !muted);
+      b.setAttribute("aria-pressed", String(!muted));
+      b.textContent = (muted ? "🔇" : "🔊") + (b.classList.contains("sound-compact") ? "" : " " + t("ctrl_sound"));
+    }
   }
-  el.btnSound.addEventListener("click", function () {
+  function toggleMute() {
     muted = !muted;
     try { localStorage.setItem("ot_muted", muted ? "1" : "0"); } catch (e) {}
     if (window.OT_SFX) OT_SFX.setMuted(muted);
-    if (muted) ambience.pause(); else { audioStarted = false; startAudio(); }
     refreshSoundBtn();
-  });
+  }
 
   // ── i18n: re-render dynamic strings when the language changes ────────────────
   function relocalize() {

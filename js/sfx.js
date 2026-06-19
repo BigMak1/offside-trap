@@ -6,6 +6,8 @@
   "use strict";
 
   var ctx = null, muted = false;
+  // ── looping music (decoded Web Audio buffer = gap-less loop), one track at a time ──
+  var MUSIC_VOL = 0.4, musicUrl = null, musicSrc = null, buffers = {};
 
   function ensure() {
     if (!ctx) {
@@ -14,6 +16,7 @@
       try { ctx = new AC(); } catch (e) { return null; }
     }
     if (ctx.state === "suspended") { try { ctx.resume(); } catch (e) {} }
+    startMusic();   // a track may have been queued before the context was unlocked
     return ctx;
   }
 
@@ -69,9 +72,44 @@
     if (fn) try { fn(); } catch (e) {}
   }
 
+  function stopMusic() {
+    if (musicSrc) { try { musicSrc.stop(); } catch (e) {} musicSrc = null; }
+  }
+  function startMusic() {
+    if (!ctx || muted || !musicUrl) return;
+    if (musicSrc && musicSrc._url === musicUrl) return;        // already on this track
+    var url = musicUrl;
+    function go(buf) {
+      if (musicUrl !== url || muted || !ctx) return;           // track changed / muted while decoding
+      stopMusic();
+      var src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+      var g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(MUSIC_VOL, ctx.currentTime + 0.7);   // smooth fade-in
+      src.connect(g); g.connect(ctx.destination); src.start();
+      src._url = url; musicSrc = src;
+    }
+    if (buffers[url]) go(buffers[url]);
+    else fetch(url).then(function (r) { return r.arrayBuffer(); })
+      .then(function (a) { return ctx.decodeAudioData(a); })
+      .then(function (b) { buffers[url] = b; go(b); })
+      .catch(function () {});
+  }
+  // Switch to a looping track (no-op if already on it); plays once the context is unlocked.
+  function music(url) {
+    if (musicUrl === url) { if (!musicSrc) startMusic(); return; }
+    musicUrl = url;
+    stopMusic();
+    if (ctx) startMusic();
+  }
+  function setMuted(m) {
+    muted = !!m;
+    if (muted) stopMusic(); else startMusic();
+  }
+
   var api = {
-    ensure: ensure, play: play,
-    setMuted: function (m) { muted = !!m; },
+    ensure: ensure, play: play, music: music, stopMusic: stopMusic,
+    setMuted: setMuted,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   global.OT_SFX = api;

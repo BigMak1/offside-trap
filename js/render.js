@@ -39,6 +39,7 @@
     this.showDebug = false;
     this.reveals = {};
     this.particles = [];
+    this.pickups = [];
     this.flash = 0;
     this.goalFlashUntil = 0;
     this.shakeUntil = 0;
@@ -105,7 +106,7 @@
         self.reveals[e.idx] = { start: now + order * 20, dur: 170 };
         order++;
       }
-      if (e.type === "artifact") self.spawnBurst(e.idx, e.kind === "save" ? PAL.gold : PAL.green, 14);
+      if (e.type === "artifact") { self.pickups.push({ sprite: "artifact-" + e.kind, idx: e.idx, born: now, dur: 1100 }); self.spawnBurst(e.idx, e.kind === "save" ? PAL.gold : PAL.green, 20); }
       else if (e.type === "save") { self.shakeUntil = now + 220; self.spawnBurst(e.idx, PAL.gold, 18); }  // glove save — not a hit
       else if (e.type === "duel") { self.shakeUntil = now + 380; self.flash = now; self.spawnBurst(e.idx, PAL.red, 14); }
       else if (e.type === "goal") { self.goalFlashUntil = now + 750; self.shakeUntil = now + 450; self.spawnBurst(e.idx, PAL.gold, 34); }
@@ -163,16 +164,14 @@
     }
   };
 
-  // Draw an opponent (defender/keeper): the figure sits in the UPPER part of the cell with
-  // margin, and the HP number is a small badge BELOW it — Dragonsweeper-style, no overlap.
-  Renderer.prototype.drawToken = function (spriteName, power, r, alpha, numColor) {
-    var ctx = this.ctx;
-    var size = Math.round(TILE * 0.6);                       // figure ~60% of the cell
-    var x = r.x + Math.round((TILE - size) / 2), y = r.y;    // top-centred
-    if (alpha != null) ctx.globalAlpha = alpha;
+  // Draw an opponent (defender/keeper) centred in the cell with margin. Deduction mode has no
+  // HP/stamina, so there is no number label; beaten defenders stay full-colour (not faded).
+  Renderer.prototype.drawToken = function (spriteName, r, alpha) {
+    var size = Math.round(TILE * 0.78);
+    var x = r.x + Math.round((TILE - size) / 2), y = r.y + Math.round((TILE - size) / 2);
+    if (alpha != null) this.ctx.globalAlpha = alpha;
     this.drawSprite(spriteName, x, y, size, size);
-    if (alpha != null) ctx.globalAlpha = 1;
-    this.drawNumber(power, r.x, r.y, { backing: numColor || true, anchor: "bottom", small: true });
+    if (alpha != null) this.ctx.globalAlpha = 1;
   };
 
   // Draw an artifact pickup ('save'|'scout') centred in the cell.
@@ -202,7 +201,7 @@
     if (cell.kind === "keeper") {
       if (!cell.beaten) {
         this.drawSprite("tile-hidden", r.x, r.y, TILE, TILE);
-        this.drawToken("keeper", cell.power, r, null, PAL.gold);
+        this.drawToken("keeper", r);
       } else {
         this.drawSprite(this.grassName(idx), r.x, r.y, TILE, TILE);
         ctx.globalAlpha = 0.3; this.drawSprite("keeper", r.x, r.y, TILE, TILE); ctx.globalAlpha = 1;
@@ -218,7 +217,7 @@
       this.drawSprite("tile-hidden", r.x, r.y, TILE, TILE);
       if (cell.marked) this.drawSprite("marker-cone", r.x, r.y, TILE, TILE);
       if (field && (this.showDebug || this.revealAll)) {
-        this.drawToken("defender-" + cell.power, cell.power, r, (this.revealAll && !this.showDebug) ? 0.6 : null, true);
+        this.drawToken("defender-" + cell.power, r);
       } else if (cell.artifact && (this.showDebug || this.revealAll)) {
         this.drawArtifact(cell.artifact, r, 0.7);
       }
@@ -237,9 +236,9 @@
 
     this.drawSprite(this.grassName(idx), r.x, r.y, TILE, TILE);
     if (cell.lost) {
-      this.drawToken("defender-" + (cell.power || 1), cell.power || 1, r, null, PAL.red);
+      this.drawToken("defender-" + (cell.power || 1), r);
     } else if (field && cell.beaten) {
-      this.drawToken("defender-" + cell.power, cell.power, r, 0.62, true);     // beaten: whom you got past
+      this.drawToken("defender-" + cell.power, r);     // beaten defender stays full-colour
     } else if (cell.artifact) {
       this.drawArtifact(cell.artifact, r, 1);
     } else if (cell.pressure > 0) {
@@ -277,6 +276,24 @@
     }
     ctx.globalAlpha = 1;
     this.particles = keep;
+  };
+
+  // Artifact pickup flourish: the item floats up, grows, and fades over ~1.1s (prominent + lasting).
+  Renderer.prototype.drawPickups = function () {
+    var ctx = this.ctx, now = this.now, keep = [];
+    for (var i = 0; i < this.pickups.length; i++) {
+      var p = this.pickups[i], t = (now - p.born) / p.dur;
+      if (t >= 1) continue;
+      var c = this.cellCenter(p.idx);
+      var ease = 1 - (1 - t) * (1 - t);                       // easeOut
+      var size = Math.round(TILE * (0.7 + 0.95 * ease));       // grow ~0.7 -> 1.65 of a tile
+      var rise = Math.round(TILE * 0.7 * ease);                // float upward
+      ctx.globalAlpha = t < 0.6 ? 1 : Math.max(0, 1 - (t - 0.6) / 0.4);  // hold, then fade
+      this.drawSprite(p.sprite, Math.round(c.x - size / 2), Math.round(c.y - size / 2 - rise), size, size);
+      ctx.globalAlpha = 1;
+      keep.push(p);
+    }
+    this.pickups = keep;
   };
 
   Renderer.prototype.render = function (now) {
@@ -325,6 +342,7 @@
     }
 
     this.drawParticles();
+    this.drawPickups();
 
     if (now < this.goalFlashUntil) {
       ctx.globalAlpha = Math.max(0, (this.goalFlashUntil - now) / 750) * 0.7;

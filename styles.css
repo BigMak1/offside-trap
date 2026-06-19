@@ -88,6 +88,8 @@ img { image-rendering: pixelated; image-rendering: crisp-edges; }
   text-shadow: 4px 4px 0 var(--ink), 0 0 16px rgba(255,225,77,0.35);
 }
 .menu { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 320px; }
+.menu-toggles { display: flex; gap: 10px; }
+.menu-toggles .px-btn { flex: 1; }
 .tagline { margin: 0; color: var(--grey); font-size: 13px; text-align: center; }
 
 /* ── pixel buttons ───────────────────────────────────────────────────────── */

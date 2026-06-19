@@ -1,0 +1,23 @@
+# Tooling & skills — large binaries/gifs, NOT part of the game
+.claude/
+pixel-plugin/
+
+# Dependencies
+node_modules/
+
+# Deploy / build / QA artifacts
+.vercel/
+.playwright-mcp/
+assets/_build/_preview.png
+
+# Temp scratch & screenshots (keep the repo clean for agents reading it)
+/*.png
+ot-*.png
+page-*.png
+screenshot*.png
+*.log
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db

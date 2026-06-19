@@ -1,0 +1,131 @@
+{
+  "tileSize": 16,
+  "note": "Native-resolution sprites; scale only by integer factors.",
+  "palette": {
+    "K": "#0B1322",
+    "N": "#15233B",
+    "B": "#243B59",
+    "S": "#3E5C7E",
+    "p": "#123A24",
+    "g": "#1C5C34",
+    "G": "#2E8F4E",
+    "L": "#4FBE6C",
+    "C": "#AEBFCF",
+    "W": "#F3F1E2",
+    "R": "#E5484D",
+    "O": "#FF8C2B",
+    "Y": "#FFE14D"
+  },
+  "sprites": {
+    "ball": {
+      "file": "assets/ball.png",
+      "w": 16,
+      "h": 16
+    },
+    "defender-1": {
+      "file": "assets/defender-1.png",
+      "w": 16,
+      "h": 16
+    },
+    "defender-2": {
+      "file": "assets/defender-2.png",
+      "w": 16,
+      "h": 16
+    },
+    "defender-3": {
+      "file": "assets/defender-3.png",
+      "w": 16,
+      "h": 16
+    },
+    "digit-0": {
+      "file": "assets/digit-0.png",
+      "w": 16,
+      "h": 16
+    },
+    "digit-1": {
+      "file": "assets/digit-1.png",
+      "w": 16,
+      "h": 16
+    },
+    "digit-2": {
+      "file": "assets/digit-2.png",
+      "w": 16,
+      "h": 16
+    },
+    "digit-3": {
+      "file": "assets/digit-3.png",
+      "w": 16,
+      "h": 16
+    },
+    "digit-4": {
+      "file": "assets/digit-4.png",
+      "w": 16,
+      "h": 16
+    },
+    "digit-5": {
+      "file": "assets/digit-5.png",
+      "w": 16,
+      "h": 16
+    },
+    "digit-6": {
+      "file": "assets/digit-6.png",
+      "w": 16,
+      "h": 16
+    },
+    "goal-left": {
+      "file": "assets/goal-left.png",
+      "w": 16,
+      "h": 16
+    },
+    "goal-mid": {
+      "file": "assets/goal-mid.png",
+      "w": 16,
+      "h": 16
+    },
+    "goal-right": {
+      "file": "assets/goal-right.png",
+      "w": 16,
+      "h": 16
+    },
+    "icon-skill": {
+      "file": "assets/icon-skill.png",
+      "w": 16,
+      "h": 16
+    },
+    "icon-stamina": {
+      "file": "assets/icon-stamina.png",
+      "w": 16,
+      "h": 16
+    },
+    "marker-cone": {
+      "file": "assets/marker-cone.png",
+      "w": 16,
+      "h": 16
+    },
+    "particle-confetti": {
+      "file": "assets/particle-confetti.png",
+      "w": 8,
+      "h": 8
+    },
+    "particle-ring": {
+      "file": "assets/particle-ring.png",
+      "w": 8,
+      "h": 8
+    },
+    "particle-spark": {
+      "file": "assets/particle-spark.png",
+      "w": 8,
+      "h": 8
+    },
+    "tile-hidden": {
+      "file": "assets/tile-hidden.png",
+      "w": 16,
+      "h": 16
+    },
+    "tile-revealed-empty": {
+      "file": "assets/tile-revealed-empty.png",
+      "w": 16,
+      "h": 16
+    }
+  }
+}

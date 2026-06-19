@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0B1322" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%230B1322'/><circle cx='8' cy='8' r='5' fill='%23F3F1E2'/></svg>" />
+  <title>Offside Trap</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <h1 class="logo">OFFSIDE<span>TRAP</span></h1>
+      <div class="seed">доска <strong id="seed-val">—</strong></div>
+    </header>
+
+    <div class="hud">
+      <div class="stat" title="Навык (skill)">
+        <img class="stat-ico" src="assets/icon-skill.png" alt="skill" />
+        <span class="stat-num" id="skill-val">1</span>
+      </div>
+      <div class="stat stat-wide" title="Стамина (stamina)">
+        <img class="stat-ico" src="assets/icon-stamina.png" alt="stamina" />
+        <div class="bars">
+          <span class="stat-num" id="stamina-val">5 / 5</span>
+          <div class="bar"><i id="stamina-bar" class="fill stamina"></i></div>
+        </div>
+      </div>
+      <div class="stat stat-wide" title="Уровень / XP">
+        <span class="stat-label">LVL <span class="stat-num" id="level-val">0</span></span>
+        <div class="bar"><i id="xp-bar" class="fill xp"></i></div>
+      </div>
+    </div>
+
+    <div class="stage" id="stage">
+      <canvas id="game"></canvas>
+      <div class="pop-layer" id="pop-layer"></div>
+      <div class="banner" id="banner">
+        <div class="banner-box">
+          <div class="banner-title" id="banner-title">GOAL!</div>
+          <div class="banner-sub" id="banner-sub"></div>
+          <button class="btn primary" id="banner-again">Сыграть снова</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn" id="btn-mark" aria-pressed="false" title="Режим маркера: ставит конус на подозрительную клетку">🚩 Маркер</button>
+      <button class="btn" id="btn-replay" title="Переиграть текущую доску">↻ Заново</button>
+      <button class="btn" id="btn-practice" title="Случайная тренировочная доска">🎲 Практика</button>
+      <button class="btn" id="btn-crt" aria-pressed="false" title="CRT / scanline-оверлей">📺 CRT</button>
+      <button class="btn" id="btn-debug" aria-pressed="false" title="Показать всю доску (отладка)">👁 Debug</button>
+    </div>
+
+    <p class="hint">
+      Тапни клетку рядом с мячом, чтобы вести его к воротам наверху. Число — сумма рейтингов
+      защитников вокруг. Долгий тап / правый клик — поставить конус.
+    </p>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/rng.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

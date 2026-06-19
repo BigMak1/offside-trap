@@ -1,0 +1,202 @@
+/* Offside Trap — "stadium evening under floodlights" palette.
+   Single source of palette truth for the UI (mirrors the sprite palette). */
+:root {
+  --ink:   #0B1322;  /* midnight */
+  --navy:  #15233B;
+  --steel: #243B59;
+  --slate: #3E5C7E;
+  --pitch: #123A24;
+  --grass: #1C5C34;
+  --grass2:#2E8F4E;
+  --grass3:#4FBE6C;
+  --grey:  #AEBFCF;
+  --white: #F3F1E2;
+  --red:   #E5484D;
+  --orange:#FF8C2B;
+  --gold:  #FFE14D;
+
+  --ui-font: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, "SFMono-Regular", "Consolas", monospace;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background:
+    radial-gradient(120% 80% at 50% -10%, #1c3350 0%, var(--ink) 55%, #05080f 100%);
+  color: var(--white);
+  font-family: var(--ui-font);
+  overscroll-behavior: none;
+}
+
+.app {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 10px 12px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── top bar ─────────────────────────────────────────────────────────────── */
+.topbar { display: flex; align-items: baseline; justify-content: space-between; }
+.logo {
+  margin: 0;
+  font-family: var(--mono);
+  font-weight: 800;
+  font-size: clamp(20px, 6vw, 30px);
+  letter-spacing: 2px;
+  color: var(--white);
+  text-shadow: 0 2px 0 var(--ink), 0 0 14px rgba(255, 225, 77, 0.25);
+}
+.logo span { color: var(--gold); margin-left: 6px; }
+.seed { font-family: var(--mono); font-size: 13px; color: var(--grey); }
+.seed strong { color: var(--gold); }
+
+/* ── HUD ─────────────────────────────────────────────────────────────────── */
+.hud {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(36, 59, 89, 0.55);
+  border: 1px solid rgba(174, 191, 207, 0.18);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.stat-wide { flex: 1; }
+.stat-ico {
+  width: 24px; height: 24px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+.stat-num { font-family: var(--mono); font-weight: 700; font-size: 16px; }
+.stat-label { font-family: var(--mono); font-size: 13px; color: var(--grey); }
+.bars { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.bar {
+  height: 8px;
+  background: rgba(11, 19, 34, 0.7);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.fill { display: block; height: 100%; transition: width 0.25s ease; border-radius: 5px; }
+.fill.stamina { background: linear-gradient(90deg, var(--grass2), var(--grass3)); }
+.fill.xp { background: linear-gradient(90deg, var(--orange), var(--gold)); }
+
+/* ── stage / canvas ──────────────────────────────────────────────────────── */
+.stage {
+  position: relative;
+  align-self: center;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 0 0 2px rgba(174, 191, 207, 0.1);
+}
+canvas#game {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  touch-action: none;
+  background: var(--pitch);
+}
+
+/* CRT / scanline overlay (toggle) */
+.stage.crt::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(0deg, rgba(0,0,0,0.18) 0 1px, transparent 1px 3px),
+    radial-gradient(120% 120% at 50% 50%, transparent 60%, rgba(0,0,0,0.45) 100%);
+  mix-blend-mode: multiply;
+  animation: flicker 5s infinite steps(60);
+}
+@keyframes flicker { 0%,100% { opacity: 0.85; } 50% { opacity: 1; } }
+
+/* ── floating popups ─────────────────────────────────────────────────────── */
+.pop-layer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.popup {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-family: var(--mono);
+  font-weight: 800;
+  font-size: 15px;
+  white-space: nowrap;
+  text-shadow: 0 2px 0 var(--ink);
+  animation: floatUp 0.9s ease-out forwards;
+}
+.popup.xp { color: var(--gold); }
+.popup.cost { color: var(--red); margin-top: 14px; }
+.popup.level { color: var(--grass3); font-size: 17px; }
+@keyframes floatUp {
+  0% { opacity: 0; transform: translate(-50%, 0); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -36px); }
+}
+
+/* ── win/lose banner ─────────────────────────────────────────────────────── */
+.banner {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(5, 8, 15, 0.7);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.banner.show { opacity: 1; pointer-events: auto; }
+.banner-box { text-align: center; padding: 24px; }
+.banner-title {
+  font-family: var(--mono);
+  font-weight: 900;
+  font-size: clamp(34px, 12vw, 60px);
+  letter-spacing: 3px;
+  margin-bottom: 6px;
+  animation: pop 0.4s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+.banner.won .banner-title { color: var(--gold); text-shadow: 0 0 22px rgba(255,225,77,0.6), 0 3px 0 var(--ink); }
+.banner.lost .banner-title { color: var(--red); text-shadow: 0 3px 0 var(--ink); }
+.banner-sub { color: var(--grey); margin-bottom: 16px; font-size: 14px; }
+@keyframes pop { 0% { transform: scale(0.3); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+/* ── controls ────────────────────────────────────────────────────────────── */
+.controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.btn {
+  min-height: 46px;
+  padding: 0 16px;
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--white);
+  background: rgba(36, 59, 89, 0.7);
+  border: 1px solid rgba(174, 191, 207, 0.22);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 0.08s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.btn:hover { background: rgba(62, 92, 126, 0.8); }
+.btn:active { transform: translateY(1px) scale(0.98); }
+.btn.active {
+  background: rgba(255, 225, 77, 0.18);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+.btn.primary { background: var(--gold); color: var(--ink); border-color: var(--gold); }
+.btn.primary:hover { filter: brightness(1.08); }
+
+.hint {
+  margin: 2px auto 0;
+  max-width: 460px;
+  text-align: center;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--grey);
+}
+
+@media (min-width: 480px) {
+  .hint { font-size: 13px; }
+}

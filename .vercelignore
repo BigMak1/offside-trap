@@ -1,0 +1,9 @@
+# Deploy only the game itself — keep tooling, specs and skill binaries out.
+.git
+.claude
+pixel-plugin
+.ai
+tests
+assets/_build
+node_modules
+*.log

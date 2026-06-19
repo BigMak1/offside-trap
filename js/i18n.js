@@ -25,6 +25,7 @@
       ctrl_guide: "? DOSSIER",
       ctrl_crt: "📺 CRT",
       ctrl_debug: "👁 DEBUG",
+      ctrl_sound: "SOUND",
       hint: "Dribble the ball up to the goal, opening cells next to it. A number is the sum of the surrounding defenders' power (the keeper counts too). Long-press / right-click drops a cone.",
       // banner buttons
       banner_again: "↻ AGAIN",
@@ -77,6 +78,7 @@
       ctrl_guide: "? ДОСЬЕ",
       ctrl_crt: "📺 CRT",
       ctrl_debug: "👁 DEBUG",
+      ctrl_sound: "ЗВУК",
       hint: "Веди мяч к воротам наверху, вскрывая соседние клетки. Число — сумма сил защитников вокруг (вратарь тоже). Долгий тап / правый клик ставит конус.",
       banner_again: "↻ СНОВА",
       banner_menu: "☰ МЕНЮ",

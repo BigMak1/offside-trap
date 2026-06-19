@@ -41,6 +41,7 @@
     btnReplay: document.getElementById("btn-replay"),
     btnCrt: document.getElementById("btn-crt"),
     btnDebug: document.getElementById("btn-debug"),
+    btnSound: document.getElementById("btn-sound"),
   };
 
   var renderer, state, markMode = false;
@@ -296,9 +297,33 @@
   el.btnReplay.addEventListener("click", function () { newGame(difficulty, seedKey); });
   el.bannerAgain.addEventListener("click", function () { newGame(difficulty, seedKey); });
 
+  // ── stadium ambience: starts on first user gesture (autoplay policy); mute persists ──
+  var muted = localStorage.getItem("ot_muted") === "1";
+  var ambience = new Audio("assets/audio/stadium-ambience.mp3");
+  ambience.loop = true; ambience.volume = 0.35; ambience.preload = "auto";
+  var audioStarted = false;
+  function startAudio() {
+    if (audioStarted || muted) return;
+    audioStarted = true;
+    var p = ambience.play();
+    if (p && p.catch) p.catch(function () { audioStarted = false; });
+  }
+  document.addEventListener("pointerdown", startAudio);
+  function refreshSoundBtn() {
+    el.btnSound.classList.toggle("active", !muted);
+    el.btnSound.setAttribute("aria-pressed", String(!muted));
+    el.btnSound.textContent = (muted ? "🔇 " : "🔊 ") + t("ctrl_sound");
+  }
+  el.btnSound.addEventListener("click", function () {
+    muted = !muted;
+    try { localStorage.setItem("ot_muted", muted ? "1" : "0"); } catch (e) {}
+    if (muted) ambience.pause(); else { audioStarted = false; startAudio(); }
+    refreshSoundBtn();
+  });
+
   // ── i18n: re-render dynamic strings when the language changes ────────────────
   function relocalize() {
-    buildDifficultyCards(); buildRules(); buildSquad();
+    buildDifficultyCards(); buildRules(); buildSquad(); refreshSoundBtn();
     if (state) {
       updateHUD();
       el.seed.textContent = seedLabel() + " · " + diffLabel(difficulty);
@@ -330,7 +355,7 @@
 
   R.loadSprites("assets/").then(function (sprites) {
     renderer = new R.Renderer(el.canvas, sprites, activeCfg);
-    I.apply(); buildDifficultyCards(); buildRules(); buildSquad(); showGuideTab("rules");
+    I.apply(); buildDifficultyCards(); buildRules(); buildSquad(); showGuideTab("rules"); refreshSoundBtn();
     if (debugStart) el.btnDebug.classList.add("active");
     requestAnimationFrame(loop);
     if (debugStart || diffParam || dayOverride) startDaily(); else showScreen("title");

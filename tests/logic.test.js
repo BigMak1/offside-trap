@@ -36,6 +36,25 @@ test("resolve flattens a preset into the keys game logic reads", () => {
   assert.strictEqual(cfg.maxGenAttempts, 600);
   assert.ok(cfg.defenders && cfg.start && cfg.xpThresholds && cfg.offsideRowChoices);
   assert.strictEqual(cfg.allowSafePath, false);
+  assert.strictEqual(cfg.levelRefill, 2);       // partial refill carried through resolve()
+});
+
+test("presets expose the hardcore balance numbers (start stamina, counts, levelRefill)", () => {
+  // Easy: generous start + effectively-full refill.
+  assert.strictEqual(EASY.start.stamina, 6);
+  assert.strictEqual(EASY.start.skill, 1);
+  assert.strictEqual(EASY.levelRefill, 99);
+  assert.deepStrictEqual(EASY.defenders, { r1: 5, r2: 3, r3: 1 });
+  // Normal: tight start, partial refill, wall-sized rating>=2 pool (r2 + r3 === cols).
+  assert.strictEqual(NORMAL.start.stamina, 3);
+  assert.strictEqual(NORMAL.levelRefill, 2);
+  assert.deepStrictEqual(NORMAL.defenders, { r1: 4, r2: 7, r3: 3 });
+  assert.strictEqual(NORMAL.defenders.r2 + NORMAL.defenders.r3, NORMAL.cols); // 7 + 3 === 10
+  // Hard: tightest start, smallest refill, rating>=2 pool >= cols.
+  assert.strictEqual(HARD.start.stamina, 2);
+  assert.strictEqual(HARD.levelRefill, 1);
+  assert.deepStrictEqual(HARD.defenders, { r1: 4, r2: 9, r3: 5 });
+  assert.ok(HARD.defenders.r2 + HARD.defenders.r3 >= HARD.cols); // 9 + 5 >= 11
 });
 
 test("resolve falls back to normal for unknown / missing keys", () => {
@@ -125,6 +144,30 @@ test("Normal/Hard offside wall is complete: every column of offsideRow is a defe
   });
 });
 
+test("Normal/Hard offside wall is entirely rating>=2: no free crossing (cheapest cost >=1 at skill 1)", () => {
+  [NORMAL, HARD].forEach((cfg) => {
+    let cheapest = Infinity;
+    for (let d = 1; d <= 40; d++) {
+      const b = G.generateBoard("day:" + d, cfg);
+      let minWallRating = Infinity;
+      for (let c = 0; c < b.cols; c++) {
+        const idx = G.index(b.offsideRow, c, b.cols);
+        const def = b.cells[idx].def;
+        assert.ok(def >= 2,
+          cfg.difficulty + " day " + d + " wall column " + c + " rating " + def + " < 2 (free crossing)");
+        if (def < minWallRating) minWallRating = def;
+      }
+      // Cheapest crossing at skill 1 is max(0, minWallRating - 1) >= 1 since minWallRating >= 2.
+      const cost = Math.max(0, minWallRating - cfg.start.skill);
+      assert.ok(cost >= 1,
+        cfg.difficulty + " day " + d + " cheapest wall crossing cost " + cost + " < 1");
+      if (cost < cheapest) cheapest = cost;
+    }
+    // Report the cheapest observed crossing for the difficulty (always >= 1).
+    assert.ok(cheapest >= 1, cfg.difficulty + " somehow had a free wall crossing");
+  });
+});
+
 test("start cell is never a defender on Normal/Hard (wall guards the start)", () => {
   [NORMAL, HARD].forEach((cfg) => {
     for (let d = 1; d <= 30; d++) {
@@ -163,6 +206,78 @@ test("every preset generates winnable boards across several seeds", () => {
     for (let d = 1; d <= 15; d++) {
       const b = G.generateBoard("day:" + d, cfg);
       assert.ok(G.isWinnable(b, cfg), cfg.difficulty + " day " + d + " not winnable");
+    }
+  });
+});
+
+// ── isWinnable soundness cross-check ──────────────────────────────────────────
+// Independently verify that isWinnable's "true" verdict is consistent with the board ACTUALLY
+// being beatable by the real engine. We drive createGame/revealCell through a depth-first search
+// over duel choices (safe frontier cells are always taken first — free progress), backtracking
+// by re-running from the seed and replaying a chosen duel sequence. If isWinnable says true but
+// no play reaches the goal, the validator and engine disagree (would accept unwinnable boards).
+function enginePlayable(seedKey, cfg) {
+  // Snapshot helper: deep-clone the mutable parts of a game state so we can branch on duels.
+  function clone(s) {
+    return {
+      cfg: s.cfg,
+      board: {
+        cells: s.board.cells.map((c) => ({ ...c })),
+        startIdx: s.board.startIdx, offsideRow: s.board.offsideRow,
+        rows: s.board.rows, cols: s.board.cols,
+      },
+      player: { ...s.player },
+      status: s.status, ballIdx: s.ballIdx, events: [],
+    };
+  }
+  const root = G.createGame(seedKey, cfg);
+  let nodes = 0;
+  const CAP = 200000;
+  // DFS over states. At each state: flood all safe frontier cells first (free, deterministic),
+  // then branch on each affordable frontier defender.
+  function solve(state) {
+    if (++nodes > CAP) return false;
+    if (state.status === "won") return true;
+    if (state.status === "lost") return false;
+    // 1) Take every safe frontier reveal (free). Each may win or open more region.
+    let progressed = true;
+    while (progressed && state.status === "playing") {
+      progressed = false;
+      for (let i = 0; i < state.board.cells.length; i++) {
+        if (G.isFrontier(state, i) && state.board.cells[i].def === 0) {
+          G.revealCell(state, i, {});
+          progressed = true;
+          if (state.status === "won") return true;
+          if (state.status === "lost") return false;
+        }
+      }
+    }
+    if (state.status === "won") return true;
+    if (state.status !== "playing") return false;
+    // 2) Branch on each affordable frontier defender.
+    for (let i = 0; i < state.board.cells.length; i++) {
+      if (!G.isFrontier(state, i)) continue;
+      const cell = state.board.cells[i];
+      if (cell.def === 0) continue;
+      const cost = Math.max(0, cell.def - state.player.skill);
+      if (cost > state.player.stamina) continue;
+      const branch = clone(state);
+      G.revealCell(branch, i, {});
+      if (solve(branch)) return true;
+    }
+    return false;
+  }
+  return solve(root);
+}
+
+test("isWinnable soundness: a 'true' verdict is actually beatable by the real engine", () => {
+  [EASY, NORMAL, HARD].forEach((cfg) => {
+    for (let d = 1; d <= 12; d++) {
+      const seed = "day:" + d;
+      const b = G.generateBoard(seed, cfg);
+      if (!G.isWinnable(b, cfg)) continue; // only cross-check the boards the validator accepts
+      assert.ok(enginePlayable(seed, cfg),
+        cfg.difficulty + " " + seed + ": isWinnable=true but engine could not beat it");
     }
   });
 });
@@ -233,7 +348,7 @@ test("opening move reveals the start cell and is free", () => {
 test("createGame defaults to the daily (normal) preset when no cfg passed", () => {
   const s = G.createGame("day:5");
   assert.strictEqual(s.board.cols, 10);
-  assert.strictEqual(s.player.maxStamina, 5);
+  assert.strictEqual(s.player.maxStamina, NORMAL.start.stamina); // 3 under the hardcore economy
 });
 
 test("a zero-pressure start cascades to several cells", () => {
@@ -306,7 +421,7 @@ test("duel above skill costs stamina = rating - skill", () => {
   assert.strictEqual(s.player.xp, 2);
 });
 
-test("losing a duel (cost > stamina) ends the game", () => {
+test("losing a duel (cost > stamina) ends the game with a 'tackle' gameover", () => {
   const s = G.createGame("day:9", NORMAL);
   s.player.stamina = 0;
   s.player.skill = 1;
@@ -315,28 +430,133 @@ test("losing a duel (cost > stamina) ends the game", () => {
   s.board.cells[target].def = 3; // cost = 2 > 0 stamina
   s.board.cells[target].pressure = 0;
   const ev = G.revealCell(s, target, {});
-  assert.ok(ev.some((e) => e.type === "gameover"));
+  const over = ev.find((e) => e.type === "gameover");
+  assert.ok(over, "expected a gameover event");
+  assert.strictEqual(over.reason, "tackle");
+  assert.strictEqual(over.idx, target);
+  assert.strictEqual(over.rating, 3);
+  assert.strictEqual(over.cost, 2);
+  assert.strictEqual(over.stamina, 0); // what the player HAD (< cost)
   assert.strictEqual(s.status, "lost");
 });
 
 // ── leveling ─────────────────────────────────────────────────────────────────
-test("crossing an XP threshold raises skill, refills + grows stamina", () => {
+test("crossing an XP threshold raises skill, grows max, and PARTIALLY refills stamina", () => {
+  // Normal: levelRefill = 2 (NOT a full refill). Craft a single affordable rating-3 duel that
+  // crosses exactly one threshold, then verify stamina = min(newMax, prevStamina - cost + 2).
   const s = G.createGame("day:9", NORMAL);
-  const beforeSkill = s.player.skill;
-  const beforeMax = s.player.maxStamina;
-  s.player.stamina = 0;
-  s.player.xp = NORMAL.xpThresholds[0] - 3; // one rating-3 win will cross it
+  const beforeSkill = s.player.skill;     // 1
+  const beforeMax = s.player.maxStamina;  // 3
+  s.player.xp = NORMAL.xpThresholds[0] - 3; // one rating-3 win (+3 xp) crosses the first tier
   const target = firstFrontier(s);
   assert.ok(target >= 0, "no frontier cell found");
   s.board.cells[target].def = 3;
   s.board.cells[target].pressure = 0;
-  // make sure we can afford: skill 1 vs rating 3 => cost 2, give stamina
-  s.player.stamina = 5;
+  // skill 1 vs rating 3 => cost 2; give enough to afford it with a known remainder.
+  s.player.stamina = 3;
+  const ev = G.revealCell(s, target, {});
+  assert.ok(ev.some((e) => e.type === "levelup"), "should level up");
+  assert.strictEqual(s.player.skill, beforeSkill + 1);
+  assert.strictEqual(s.player.maxStamina, beforeMax + 1); // 4
+  // After paying cost 2 from 3 => 1 stamina; +levelRefill(2) = 3, capped at new max 4 => 3.
+  const expected = Math.min(beforeMax + 1, (3 - 2) + NORMAL.levelRefill);
+  assert.strictEqual(s.player.stamina, expected);          // 3, NOT a full refill to 4
+  assert.ok(s.player.stamina < s.player.maxStamina, "partial refill did not top up to max");
+});
+
+test("Hard level-up refills only levelRefill(1) stamina, not to full", () => {
+  const s = G.createGame("day:9", HARD);
+  s.player.xp = HARD.xpThresholds[0] - 3; // one rating-3 win crosses the first tier
+  const target = firstFrontier(s);
+  assert.ok(target >= 0, "no frontier cell found");
+  s.board.cells[target].def = 3;          // cost 2 at skill 1
+  s.board.cells[target].pressure = 0;
+  s.player.stamina = 4;
+  const beforeMax = s.player.maxStamina;
   const ev = G.revealCell(s, target, {});
   assert.ok(ev.some((e) => e.type === "levelup"));
-  assert.strictEqual(s.player.skill, beforeSkill + 1);
-  assert.strictEqual(s.player.maxStamina, beforeMax + 1);
-  assert.strictEqual(s.player.stamina, s.player.maxStamina); // refilled
+  // 4 - 2 = 2, + levelRefill(1) = 3, capped at new max (beforeMax + 1).
+  const expected = Math.min(beforeMax + 1, (4 - 2) + HARD.levelRefill);
+  assert.strictEqual(s.player.stamina, expected);
+});
+
+// ── stranded loss (soft-lock closed) ──────────────────────────────────────────
+test("isStranded: every frontier is an unaffordable defender => move triggers a 'stranded' loss", () => {
+  // Craft a small grid: an open row 2 (approach) flooded from the start, then a wall of
+  // rating-3 defenders on row 1 that the player can never afford (skill 1, 0 stamina => cost 2).
+  // After revealing a safe approach cell (which doesn't win), the engine must detect the lock.
+  const cols = 3, rows = 4;
+  const cells = [];
+  for (let i = 0; i < rows * cols; i++) {
+    cells.push({ def: 0, pressure: 0, revealed: false, marked: false, beaten: false, lost: false });
+  }
+  // Wall row 1 entirely with rating-3 defenders.
+  for (let c = 0; c < cols; c++) cells[1 * cols + c].def = 3;
+  const startIdx = (rows - 1) * cols + 1; // bottom-centre
+  const board = { cells, startIdx, offsideRow: 1, rows, cols };
+  // Build a state by hand so we control the player economy precisely.
+  const state = {
+    cfg: NORMAL, board,
+    player: { skill: 1, stamina: 0, maxStamina: 3, xp: 0, level: 0 },
+    status: "playing", ballIdx: startIdx, events: [],
+  };
+  // Reveal the start (initial: never strands) — floods the open approach (rows 2 & 3).
+  G.revealCell(state, startIdx, { initial: true, force: true });
+  assert.strictEqual(state.status, "playing", "opening reveal must not strand");
+  // Sanity: every frontier cell is now a rating-3 defender (the wall), all unaffordable.
+  let frontierDefenders = 0;
+  for (let i = 0; i < cells.length; i++) {
+    if (G.isFrontier(state, i)) { assert.strictEqual(cells[i].def, 3); frontierDefenders++; }
+  }
+  assert.ok(frontierDefenders > 0, "expected wall defenders on the frontier");
+  assert.strictEqual(G.isStranded(state), true, "should report stranded");
+  // A subsequent non-initial reveal of an already-safe frontier-adjacent cell... but all
+  // frontier cells are walls. Instead, re-reveal via a safe move on the approach to trigger the
+  // post-action stranded check. Reveal a still-hidden safe approach cell adjacent to the ball.
+  // Simpler: drive any non-initial action and assert the loss. Find a hidden safe cell to mark/
+  // unmark then reveal — but cleanest is to call revealCell on a safe frontier-adjacent... none.
+  // So directly exercise the check via a no-win safe reveal: pick a hidden safe cell and reveal.
+  // Here the whole approach is already revealed, so use the public path: a duel attempt that the
+  // player cannot win is a 'tackle' loss, not stranded. To test the STRANDED path specifically,
+  // reveal a safe cell that does not win. We force one hidden safe cell at row 2 then reveal it.
+  cells[2 * cols + 0].revealed = false; // re-hide a safe approach cell
+  const ev = G.revealCell(state, 2 * cols + 0, {});
+  const over = ev.find((e) => e.type === "gameover");
+  assert.ok(over, "expected a gameover event after the stranded move");
+  assert.strictEqual(over.reason, "stranded");
+  assert.strictEqual(over.stamina, 0);
+  assert.strictEqual(over.idx, state.ballIdx);
+  assert.strictEqual(state.status, "lost");
+});
+
+test("gameover events carry a reason ('tackle' on unaffordable duel, 'stranded' otherwise)", () => {
+  // tackle
+  const s1 = G.createGame("day:9", NORMAL);
+  s1.player.stamina = 0;
+  const t1 = firstFrontier(s1);
+  s1.board.cells[t1].def = 3; s1.board.cells[t1].pressure = 0;
+  const ev1 = G.revealCell(s1, t1, {});
+  assert.strictEqual(ev1.find((e) => e.type === "gameover").reason, "tackle");
+
+  // stranded: build a hand-state whose only frontier options are unaffordable, then reveal a
+  // safe (non-winning) cell to trip the post-action check.
+  const cols = 3, rows = 4;
+  const cells = [];
+  for (let i = 0; i < rows * cols; i++) {
+    cells.push({ def: 0, pressure: 0, revealed: false, marked: false, beaten: false, lost: false });
+  }
+  for (let c = 0; c < cols; c++) cells[1 * cols + c].def = 3;
+  const startIdx = (rows - 1) * cols + 1;
+  const board = { cells, startIdx, offsideRow: 1, rows, cols };
+  const s2 = {
+    cfg: NORMAL, board,
+    player: { skill: 1, stamina: 0, maxStamina: 3, xp: 0, level: 0 },
+    status: "playing", ballIdx: startIdx, events: [],
+  };
+  G.revealCell(s2, startIdx, { initial: true, force: true });
+  cells[2 * cols + 2].revealed = false; // re-hide a safe cell to reveal as a non-winning move
+  const ev2 = G.revealCell(s2, 2 * cols + 2, {});
+  assert.strictEqual(ev2.find((e) => e.type === "gameover").reason, "stranded");
 });
 
 // ── marking ──────────────────────────────────────────────────────────────────

@@ -103,20 +103,44 @@
   function placeForcedLine(cells, rnd, cfg, startIdx, offsideRow) {
     var rows = cfg.rows, cols = cfg.cols, n = rows * cols;
 
-    var ratings = shuffle(ratingList(cfg), rnd);
-    var ri = 0;
+    // Split the squad into a rating>=2 pool and a rating-1 pool. The WALL must always COST to
+    // cross at skill 1, so we fill it preferentially from rating>=2 defenders; rating-1s only
+    // backfill the wall if there aren't enough >=2 defenders to span every column.
+    var all = ratingList(cfg);
+    var pool2 = [];   // rating >= 2
+    var pool1 = [];   // rating 1
+    for (var t = 0; t < all.length; t++) {
+      if (all[t] >= 2) pool2.push(all[t]); else pool1.push(all[t]);
+    }
+    shuffle(pool2, rnd);
+    shuffle(pool1, rnd);
 
-    // 1) The wall: one defender in every column of offsideRow (guard the start cell).
-    for (var c = 0; c < cols && ri < ratings.length; c++) {
+    // The wall needs one defender per non-start column of offsideRow.
+    var wallCols = [];
+    for (var c = 0; c < cols; c++) {
       var wallCell = index(offsideRow, c, cols);
       if (wallCell === startIdx) continue; // never place a defender on the start cell
-      cells[wallCell].def = ratings[ri++];
+      wallCols.push(wallCell);
     }
 
-    // 2) Scatter the remaining ratings onto other cells (NOT in offsideRow, NOT the start).
-    //    Bias toward rows BELOW the wall (the approach side, rows > offsideRow) so the region
-    //    ABOVE the line (rows < offsideRow, toward goal row 0) stays navigable -> winnable.
-    if (ri < ratings.length) {
+    // Take rating>=2 first for the wall; fall back to rating-1 only if >=2 runs out.
+    var leftover = [];   // ratings not used in the wall (the rest get scattered off-row)
+    var p2 = 0, p1 = 0;
+    for (var w = 0; w < wallCols.length; w++) {
+      var rating;
+      if (p2 < pool2.length) rating = pool2[p2++];
+      else if (p1 < pool1.length) rating = pool1[p1++];
+      else break; // not enough defenders to fill the whole wall (shouldn't happen with presets)
+      cells[wallCols[w]].def = rating;
+    }
+    // Whatever rating>=2 / rating-1 defenders we didn't put in the wall get scattered.
+    for (; p2 < pool2.length; p2++) leftover.push(pool2[p2]);
+    for (; p1 < pool1.length; p1++) leftover.push(pool1[p1]);
+
+    // Scatter the leftover ratings onto other cells (NOT in offsideRow, NOT the start).
+    // Bias toward rows BELOW the wall (the approach side, rows > offsideRow) so the region
+    // ABOVE the line (rows < offsideRow, toward goal row 0) stays navigable -> winnable.
+    if (leftover.length) {
       var below = [];   // approach side: between the wall and the start (preferred)
       var rest = [];    // everywhere else off the wall (above the line + the wall's own row spillover)
       for (var a = 0; a < n; a++) {
@@ -129,9 +153,9 @@
       shuffle(below, rnd);
       shuffle(rest, rnd);
       var scatterPool = below.concat(rest);      // drain the approach side first
-      var si = 0;
-      while (ri < ratings.length && si < scatterPool.length) {
-        cells[scatterPool[si++]].def = ratings[ri++];
+      var si = 0, li = 0;
+      while (li < leftover.length && si < scatterPool.length) {
+        cells[scatterPool[si++]].def = leftover[li++];
       }
     }
   }
@@ -171,7 +195,8 @@
   // Model real play: from the start cell, safe (def===0) cells flood-reveal for free and
   // only expand the reachable region. A frontier defender of rating r costs
   // max(0, r - skill) stamina (only attemptable if cost <= stamina); beating it grants +r xp
-  // which may trigger level-ups (each: skill+1, maxStamina+1, stamina = maxStamina).
+  // which may trigger level-ups (each: skill+1, maxStamina+1, stamina += levelRefill capped at
+  // the new max — a PARTIAL refill that must mirror handleLevelUp exactly).
   // A state's reachable region is derived from its beaten-set. The player wins when the
   // reachable region touches row 0. Because skill/level/xp/maxStamina are all functions of
   // *which* defenders are beaten (the bitmask), only `stamina` is path-dependent — so a
@@ -215,6 +240,7 @@
     cfg = cfg || defaultCfg();
     var cells = board.cells, rows = board.rows, cols = board.cols, n = cells.length;
     var xpT = cfg.xpThresholds;
+    var refill = cfg.levelRefill;
 
     // Compact defender-index list so the beaten bitmask stays small.
     var defBit = new Int16Array(n);
@@ -313,9 +339,17 @@
           if (cost > stamina) continue;            // unaffordable -> cannot attempt
           var nextBeaten = beaten | (1 << bit);
           var nextStamina = stamina - cost;
-          // Beating grants +rating xp -> recompute level/refill.
+          // Beating grants +rating xp -> may cross one or more level thresholds. This MUST
+          // mirror handleLevelUp EXACTLY: per level gained, maxStamina grows by 1 and stamina
+          // gets a PARTIAL refill of `levelRefill`, capped at the freshly-grown max. Replaying
+          // the per-level steps (rather than refilling to full) keeps validator == engine.
           var nextInfo = levelInfo(currentXp(nextBeaten));
-          if (nextInfo.level > info.level) nextStamina = nextInfo.maxStamina; // level-up refills
+          if (nextInfo.level > info.level) {
+            for (var lv = info.level; lv < nextInfo.level; lv++) {
+              var maxAtLv = baseMax + lv + 1; // maxStamina after gaining this level
+              nextStamina = Math.min(maxAtLv, nextStamina + refill);
+            }
+          }
           push(nextBeaten, nextStamina);
         }
       }
@@ -407,6 +441,35 @@
     return false;
   }
 
+  // STRANDED loss: the player is stuck when the game is still playing, not won, and NO hidden
+  // frontier cell is "actionable". A frontier cell is actionable if it is SAFE (def===0) or a
+  // defender whose duel cost max(0, def - skill) <= current stamina. Marked cells still count
+  // (the player can always unmark). When true the run is a soft-lock -> we convert it to a loss.
+  function isStranded(state) {
+    if (state.status !== "playing") return false;
+    var cells = state.board.cells, p = state.player;
+    for (var i = 0; i < cells.length; i++) {
+      if (!isFrontier(state, i)) continue;
+      var cell = cells[i];
+      if (cell.def === 0) return false; // a safe frontier cell -> always actionable
+      var cost = Math.max(0, cell.def - p.skill);
+      if (cost <= p.stamina) return false; // an affordable duel -> actionable
+    }
+    return true;
+  }
+
+  // Convert a soft-lock into an explicit loss after a non-winning action. Pushes a richly
+  // detailed gameover event the UI can present. Returns true if the run just ended.
+  function checkStranded(state, events) {
+    if (state.status !== "playing") return false;
+    if (!isStranded(state)) return false;
+    state.status = "lost";
+    events.push({
+      type: "gameover", idx: state.ballIdx, reason: "stranded", stamina: state.player.stamina,
+    });
+    return true;
+  }
+
   function xpToNext(state) {
     var t = state.cfg.xpThresholds;
     if (state.player.level >= t.length) return null;
@@ -415,11 +478,14 @@
 
   function handleLevelUp(state, events) {
     var t = state.cfg.xpThresholds, p = state.player;
+    var refill = state.cfg.levelRefill;
     while (p.level < t.length && p.xp >= t[p.level]) {
       p.level++;
       p.skill++;
       p.maxStamina++;
-      p.stamina = p.maxStamina;
+      // PARTIAL refill: each level gained restores `levelRefill` stamina (capped at the
+      // freshly-grown max), NOT a full refill — keeps the economy tight / losable.
+      p.stamina = Math.min(p.maxStamina, p.stamina + refill);
       events.push({ type: "levelup", level: p.level, skill: p.skill, maxStamina: p.maxStamina });
     }
   }
@@ -472,7 +538,12 @@
         cell.lost = true;
         state.status = "lost";
         events.push({ type: "duel", idx: i, rating: rating, cost: cost, success: false });
-        events.push({ type: "gameover", idx: i });
+        // Failed tackle: cost outran stamina. Carry reason + the duel details (stamina here is
+        // what the player HAD, which is < cost) so the UI can explain the loss.
+        events.push({
+          type: "gameover", idx: i, reason: "tackle",
+          rating: rating, cost: cost, stamina: state.player.stamina,
+        });
         return events;
       }
       state.player.stamina -= cost;
@@ -486,6 +557,8 @@
       });
       handleLevelUp(state, events);
       checkGoal(state, events, [i]);
+      // If this successful duel didn't win, a soft-lock may now exist -> stranded loss.
+      if (state.status === "playing") checkStranded(state, events);
       return events;
     }
 
@@ -495,6 +568,9 @@
     var revealed = [];
     for (var e = 0; e < events.length; e++) if (events[e].type === "reveal") revealed.push(events[e].idx);
     checkGoal(state, events, revealed);
+    // The opening/initial reveal must never trigger stranded (the board starts hidden). After a
+    // normal safe-reveal/cascade that didn't win, check for the soft-lock.
+    if (!opts.initial && state.status === "playing") checkStranded(state, events);
     return events;
   }
 
@@ -512,6 +588,7 @@
     hasSafePath: hasSafePath, isSolvable: isSolvable, isWinnable: isWinnable,
     createGame: createGame, revealCell: revealCell, toggleMark: toggleMark,
     isFrontier: isFrontier, isPassable: isPassable, xpToNext: xpToNext,
+    isStranded: isStranded,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   global.OT_GAME = api;

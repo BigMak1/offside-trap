@@ -5,20 +5,22 @@
 (function (global) {
   "use strict";
 
+  // levelRefill: stamina restored PER level gained on a level-up (NOT a full refill).
+  // Hardcore balance: low start stamina + partial refills make running dry a real threat.
   var PRESETS = {
     easy: {
       label: "Лёгкий", cols: 8, rows: 7, defenders: { r1: 5, r2: 3, r3: 1 },
-      start: { skill: 1, stamina: 6 }, xpThresholds: [3, 7, 12, 18, 25],
+      start: { skill: 1, stamina: 6 }, levelRefill: 99, xpThresholds: [3, 7, 12, 18, 25],
       offsideRowChoices: [2, 3], offsideBias: 0.60, allowSafePath: true, forceLine: false,
     },
     normal: {
-      label: "Норма", cols: 10, rows: 8, defenders: { r1: 7, r2: 5, r3: 2 },
-      start: { skill: 1, stamina: 5 }, xpThresholds: [3, 7, 12, 18, 25],
+      label: "Норма", cols: 10, rows: 8, defenders: { r1: 4, r2: 7, r3: 3 },
+      start: { skill: 1, stamina: 3 }, levelRefill: 2, xpThresholds: [3, 7, 12, 18, 25],
       offsideRowChoices: [2, 3], offsideBias: 0.65, allowSafePath: false, forceLine: true,
     },
     hard: {
-      label: "Сложный", cols: 11, rows: 9, defenders: { r1: 8, r2: 7, r3: 3 },
-      start: { skill: 1, stamina: 4 }, xpThresholds: [4, 9, 15, 22, 30],
+      label: "Сложный", cols: 11, rows: 9, defenders: { r1: 4, r2: 9, r3: 5 },
+      start: { skill: 1, stamina: 2 }, levelRefill: 1, xpThresholds: [4, 9, 15, 22, 30],
       offsideRowChoices: [2, 3, 4], offsideBias: 0.70, allowSafePath: false, forceLine: true,
     },
   };

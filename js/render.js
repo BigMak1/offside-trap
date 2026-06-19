@@ -57,6 +57,7 @@
     this.canvas.width = this.W;
     this.canvas.height = this.H;
     this.ctx.imageSmoothingEnabled = false;
+    this.revealAll = false;     // reveal every defender once the game is lost
   };
 
   Renderer.prototype.setState = function (state) {
@@ -117,6 +118,11 @@
         self.spawnBurst(e.idx, PAL.gold, 30);
       } else if (e.type === "levelup") {
         self.spawnBurst(self.state.ballIdx, PAL.gold, 16);
+      } else if (e.type === "gameover") {
+        self.revealAll = true;                 // post-mortem: show where the defenders were
+        self.flash = now;
+        self.shakeUntil = now + 500;
+        self.spawnBurst(typeof e.idx === "number" ? e.idx : self.state.ballIdx, PAL.red, 22);
       } else if (e.type === "illegal") {
         self.shakeUntil = now + 160;
       }
@@ -163,7 +169,11 @@
       // still hidden (or queued reveal not started yet)
       this.drawSprite("tile-hidden", r.x, r.y);
       if (cell.marked) this.drawSprite("marker-cone", r.x, r.y);
-      if (this.showDebug && cell.def > 0) this.drawSprite("defender-" + cell.def, r.x, r.y);
+      if (cell.def > 0 && (this.showDebug || this.revealAll)) {
+        if (this.revealAll && !this.showDebug) ctx.globalAlpha = 0.55; // dimmed post-mortem
+        this.drawSprite("defender-" + cell.def, r.x, r.y);
+        ctx.globalAlpha = 1;
+      }
       return;
     }
 
@@ -287,6 +297,13 @@
     // duel-fail red flash
     if (now - this.flash < 220) {
       ctx.globalAlpha = Math.max(0, (220 - (now - this.flash)) / 220) * 0.45;
+      ctx.fillStyle = PAL.red;
+      ctx.fillRect(0, 0, this.W, this.H);
+      ctx.globalAlpha = 1;
+    }
+    // persistent red tint while the game is lost (defeat reads at a glance)
+    if (st.status === "lost") {
+      ctx.globalAlpha = 0.2;
       ctx.fillStyle = PAL.red;
       ctx.fillRect(0, 0, this.W, this.H);
       ctx.globalAlpha = 1;

@@ -291,7 +291,8 @@
   // ── audio: menu music vs crowd ambience (gap-less loop via OT_SFX / Web Audio). One mute for all.
   // Music starts on the first user gesture (autoplay policy). On the game screen the context is
   // already unlocked (you clicked PLAY), so the crowd plays immediately — no cell tap required.
-  var muted = localStorage.getItem("ot_muted") === "1";
+  var muted = false;
+  try { muted = localStorage.getItem("ot_muted") === "1"; } catch (e) {}   // storage may be blocked in the iframe
   if (window.OT_SFX) OT_SFX.setMuted(muted);
   function unlockAudio() { if (window.OT_SFX) OT_SFX.ensure(); }
   ["pointerdown", "keydown", "touchstart"].forEach(function (ev) { document.addEventListener(ev, unlockAudio, { passive: true }); });

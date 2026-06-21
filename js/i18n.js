@@ -105,7 +105,11 @@
     },
   };
 
-  var lang = localStorage.getItem("ot_lang");
+  // Storage can be BLOCKED (Safari 3rd-party default, incognito, "block cookies") — esp. inside
+  // the cross-site itch.io iframe. An unguarded read throws and would kill the whole game on load,
+  // so fall back to the default language instead.
+  var lang = null;
+  try { lang = localStorage.getItem("ot_lang"); } catch (e) {}
   if (!DICT[lang]) lang = "en";
   var onChange = null;
 

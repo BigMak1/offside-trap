@@ -8,6 +8,8 @@ node_modules/
 .vercel/
 .playwright-mcp/
 assets/_build/_*.png
+# packaged builds (itch.io zip, store covers) — regenerable, kept out of git
+dist/
 
 # Large input media dropped in the task folder — not part of the shipped game
 .ai/*.mp3

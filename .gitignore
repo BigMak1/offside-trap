@@ -1,6 +1,5 @@
-# Tooling & skills — large binaries/gifs, NOT part of the game
+# Local Claude Code config & skills — not part of the game
 .claude/
-pixel-plugin/
 
 # Dependencies
 node_modules/

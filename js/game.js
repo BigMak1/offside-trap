@@ -6,10 +6,11 @@
 //     - power 0 = safe grass; kind in 'field' | 'keeper'. A 'field' cell with power 0 is SAFE.
 //     - The KEEPER sits at (goalRow=0, keeperCol), kind 'keeper', power 1, and is revealed FROM
 //       THE START — it is the GOAL. Reaching/acting on it once it borders the safe region WINS.
-//     - Field DEFENDERS carry power 1..4 (kind 'field') — they are MINES.
+//     - Field DEFENDERS are MINES (kind 'field'), all power 1 — classic minesweeper.
 //     - cell.artifact is null | 'save' | 'scout'; artifact cells are SAFE (power 0).
-//   A safe cell's NUMBER (pressure) = SUM of adjacent (8-dir) defender powers, INCLUDING the keeper.
-//   Navigate by the numbers, avoiding defenders, to reach and beat the (trivial, HP-1) keeper.
+//   A safe cell's NUMBER (pressure) = COUNT of adjacent (8-dir) field defenders. The keeper is the
+//   goal (always visible), so it is NOT counted. Navigate by the numbers, avoiding defenders, to
+//   reach and beat the (trivial, HP-1) keeper.
 //
 //   SAVES absorb a defender hit: revealing a defender with saves > 0 consumes one and the run
 //   continues; with no saves, revealing a defender is a loss. There is a guaranteed connected SAFE
@@ -55,35 +56,20 @@
   }
   function isDefenderPower(cell) { return isDefenderCell(cell) ? cell.power : 0; }
 
-  // pressure = SUM of adjacent (8-dir) defender powers, INCLUDING the keeper.
-  // Only meaningful for safe cells (power 0). Can be double-digit near clusters.
+  // A FIELD defender (mine) contributes 1 to neighbouring numbers. The keeper (kind 'keeper') is the
+  // goal — always visible — so it is deliberately NOT counted toward the pressure number.
+  function fieldDefenderCount(cell) { return (cell.kind === "field" && cell.power > 0) ? 1 : 0; }
+
+  // pressure = COUNT of adjacent (8-dir) field defenders. The keeper is NOT counted.
+  // Only meaningful for safe cells (power 0).
   function recomputePressures(cells, rows, cols) {
     var n = rows * cols;
     for (var p = 0; p < n; p++) {
       if (isDefenderPower(cells[p]) > 0) { cells[p].pressure = 0; continue; }
       var sum = 0, nb = neighbors(p, rows, cols);
-      for (var q = 0; q < nb.length; q++) sum += isDefenderPower(cells[nb[q]]);
+      for (var q = 0; q < nb.length; q++) sum += fieldDefenderCount(cells[nb[q]]);
       cells[p].pressure = sum;
     }
-  }
-
-  // Pick a power 1..4 proportional to weights {1:w1,2:w2,3:w3,4:w4}; powers with weight 0 are skipped.
-  function weightedRandomPower(rnd, weights) {
-    var powers = [1, 2, 3, 4], total = 0, p;
-    for (var i = 0; i < powers.length; i++) {
-      p = powers[i];
-      total += (weights && weights[p] > 0) ? weights[p] : 0;
-    }
-    if (total <= 0) return 1; // degenerate weights -> a power-1 defender
-    var r = rnd() * total, acc = 0;
-    for (var j = 0; j < powers.length; j++) {
-      p = powers[j];
-      var w = (weights && weights[p] > 0) ? weights[p] : 0;
-      if (w <= 0) continue;
-      acc += w;
-      if (r < acc) return p;
-    }
-    return powers[powers.length - 1];
   }
 
   // Carve a single connected SAFE path from startIdx upward to a cell ADJACENT to the keeper.
@@ -181,7 +167,7 @@
       if (a === startIdx || a === keeperIdx || onPath[a]) continue;
       if (rnd() < cfg.density) {
         cells[a].kind = "field";
-        cells[a].power = weightedRandomPower(rnd, cfg.powerWeights);
+        cells[a].power = 1;            // all defenders are power 1 — the number is a defender COUNT
       }
       // Otherwise it stays safe grass (power 0) — a cascade / decoy cell.
     }

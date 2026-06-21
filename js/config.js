@@ -6,8 +6,9 @@
 // Deduction model (classic-minesweeper football):
 //   - The KEEPER sits at the goal (top-centre, row 0), kind 'keeper', power 1, revealed from the
 //     start — it is the GOAL. Reaching/acting on it (once it borders the safe region) WINS.
-//   - Field DEFENDERS (power 1..4) are MINES. A safe cell's NUMBER (pressure) = sum of adjacent
-//     defender powers, including the keeper. Navigate by the numbers to avoid defenders.
+//   - Field DEFENDERS are MINES, all power 1 (classic minesweeper). A safe cell's NUMBER (pressure)
+//     = COUNT of adjacent defenders (the keeper is the goal and is NOT counted). Read the numbers
+//     to deduce where the defenders are and find the safe path.
 //   - There is a guaranteed connected SAFE path from the kickoff up to the keeper.
 //   - SAVES absorb a defender hit (consume one, the run continues). With no saves left, revealing
 //     a defender is a loss.
@@ -20,7 +21,6 @@
       label: "Лёгкий",
       cols: 10, rows: 15,
       density: 0.30,
-      powerWeights: { 1: 5, 2: 3, 3: 1, 4: 0 },
       startSaves: 3,
       artifacts: { save: 3, scout: 3 },
       pathWiggle: 0.35,
@@ -29,7 +29,6 @@
       label: "Норма",
       cols: 10, rows: 15,
       density: 0.42,
-      powerWeights: { 1: 4, 2: 3, 3: 2, 4: 1 },
       startSaves: 2,
       artifacts: { save: 2, scout: 2 },
       pathWiggle: 0.5,
@@ -38,7 +37,6 @@
       label: "Сложный",
       cols: 10, rows: 15,
       density: 0.55,
-      powerWeights: { 1: 2, 2: 3, 3: 3, 4: 2 },
       startSaves: 1,
       artifacts: { save: 1, scout: 2 },
       pathWiggle: 0.6,

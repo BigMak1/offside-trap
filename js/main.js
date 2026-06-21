@@ -61,7 +61,7 @@
       var card = document.createElement("button");
       card.className = "card";
       var defs = document.createElement("div"); defs.className = "card-defs";
-      [1, 2, 3, 4].forEach(function (rk) { var img = document.createElement("img"); img.src = "assets/defender-" + rk + ".png"; img.alt = ""; defs.appendChild(img); });
+      [0, 1, 2].forEach(function () { var img = document.createElement("img"); img.src = "assets/defender-1.png"; img.alt = ""; defs.appendChild(img); });
       var g = document.createElement("img"); g.src = "assets/artifact-save.png"; g.alt = ""; defs.appendChild(g);
 
       var body = document.createElement("div"); body.className = "card-body";
@@ -86,7 +86,7 @@
     var rows = [
       ["ball", "rule_goal_t", "rule_goal_d", ""],
       ["digit-3", "rule_number_t", "rule_number_d", ""],
-      ["defender-2", "rule_def_t", "rule_def_d", "lose"],
+      ["defender-1", "rule_def_t", "rule_def_d", "lose"],
       ["artifact-save", "rule_save_t", "rule_save_d", ""],
       ["artifact-scout", "rule_scout_t", "rule_scout_d", ""],
       ["marker-cone", "rule_mark_t", "rule_mark_d", ""],
@@ -117,9 +117,7 @@
       txt.appendChild(b); txt.appendChild(s); r.appendChild(img); r.appendChild(txt);
       el.squadList.appendChild(r);
     }
-    [1, 2, 3, 4].forEach(function (pw) {
-      row("defender-" + pw, t("squad_def", { p: pw }), t("squad_def_sub"), "sq" + pw);
-    });
+    row("defender-1", t("squad_def"), t("squad_def_sub"), "sq1");
     row("artifact-save", t("squad_save"), t("squad_save_sub"), "art");
     row("artifact-scout", t("squad_scout"), t("squad_scout_sub"), "art");
     row("keeper", t("squad_keeper"), t("squad_keeper_d"), "keeper");
@@ -173,7 +171,7 @@
     var kt = document.createElement("span"); kt.textContent = s.keeperBeaten ? "✓" : "★";
     kchip.appendChild(ki); kchip.appendChild(kt); el.scout.appendChild(kchip);
     // defenders remaining (mines left to avoid)
-    chip("defender-4", "×" + s.defendersRemaining);
+    chip("defender-1", "×" + s.defendersRemaining);
     // artifacts still on the board
     if (s.artifactsLeft > 0) chip("artifact-scout", "×" + s.artifactsLeft);
     function chip(sprite, text) {
@@ -218,7 +216,7 @@
       } else if (e.type === "goal") {
         showBanner("banner_goal_t", "banner_goal_s", {});
       } else if (e.type === "gameover") {
-        showBanner("banner_lost_t", "lost_caught", { p: e.power });
+        showBanner("banner_lost_t", "lost_caught", {});
       }
     });
     updateHUD();

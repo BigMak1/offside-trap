@@ -62,7 +62,7 @@ test("resolve flattens a preset into the keys game logic reads", () => {
   assert.strictEqual(cfg.tile, 32);
   assert.strictEqual(cfg.maxGenAttempts, 200);
   assert.strictEqual(cfg.startSaves, 2);
-  assert.ok(cfg.powerWeights && cfg.artifacts);
+  assert.ok(cfg.artifacts);
   assert.strictEqual(typeof cfg.density, "number");
   assert.strictEqual(typeof cfg.pathWiggle, "number");
 });
@@ -72,19 +72,16 @@ test("presets expose the Deduction balance numbers", () => {
   assert.strictEqual(EASY.cols, 10);
   assert.strictEqual(EASY.rows, 15);
   assert.strictEqual(EASY.density, 0.30);
-  assert.deepStrictEqual(EASY.powerWeights, { 1: 5, 2: 3, 3: 1, 4: 0 });
   assert.strictEqual(EASY.startSaves, 3);
   assert.deepStrictEqual(EASY.artifacts, { save: 3, scout: 3 });
   assert.strictEqual(EASY.pathWiggle, 0.35);
   // Normal.
   assert.strictEqual(NORMAL.density, 0.42);
-  assert.deepStrictEqual(NORMAL.powerWeights, { 1: 4, 2: 3, 3: 2, 4: 1 });
   assert.strictEqual(NORMAL.startSaves, 2);
   assert.deepStrictEqual(NORMAL.artifacts, { save: 2, scout: 2 });
   assert.strictEqual(NORMAL.pathWiggle, 0.5);
   // Hard.
   assert.strictEqual(HARD.density, 0.55);
-  assert.deepStrictEqual(HARD.powerWeights, { 1: 2, 2: 3, 3: 3, 4: 2 });
   assert.strictEqual(HARD.startSaves, 1);
   assert.deepStrictEqual(HARD.artifacts, { save: 1, scout: 2 });
   assert.strictEqual(HARD.pathWiggle, 0.6);
@@ -149,16 +146,17 @@ test("board scatters defenders (mines) on off-path cells", () => {
   });
 });
 
-test("defender powers respect the preset weights (no power with weight 0 appears)", () => {
-  // Easy has powerWeights[4] === 0, so no power-4 defender should ever be placed.
-  for (let d = 1; d <= 30; d++) {
-    const b = G.generateBoard("day:" + d, EASY);
-    b.cells.forEach((c) => {
-      if (c.kind === "field" && c.power > 0) {
-        assert.ok(c.power >= 1 && c.power <= 3, "easy defender power in 1..3, got " + c.power);
-      }
-    });
-  }
+test("every field defender is power 1 (the number is a defender COUNT, not a power sum)", () => {
+  [EASY, NORMAL, HARD].forEach((cfg) => {
+    for (let d = 1; d <= 30; d++) {
+      const b = G.generateBoard("day:" + d, cfg);
+      b.cells.forEach((c) => {
+        if (c.kind === "field" && c.power > 0) {
+          assert.strictEqual(c.power, 1, cfg.difficulty + " defender power must be 1, got " + c.power);
+        }
+      });
+    }
+  });
 });
 
 test("artifacts are placed on safe path cells (power 0), not on start/keeper", () => {
@@ -181,24 +179,23 @@ test("artifacts are placed on safe path cells (power 0), not on start/keeper", (
   });
 });
 
-test("pressure equals SUM of adjacent defender powers INCLUDING the keeper", () => {
+test("pressure equals the COUNT of adjacent field defenders, EXCLUDING the keeper", () => {
   const b = G.generateBoard("day:5", NORMAL);
   const cols = b.cols;
-  let sawKeeperContribution = false;
+  let checkedKeeperNeighbour = false;
   b.cells.forEach((cell, i) => {
     const isDefender = (cell.kind === "field" || cell.kind === "keeper") && cell.power > 0;
     if (isDefender) return; // pressure only meaningful on safe cells
-    let sum = 0;
+    let count = 0, touchesKeeper = false;
     G.neighbors(i, b.rows, cols).forEach((nIdx) => {
       const nb = b.cells[nIdx];
-      if ((nb.kind === "field" || nb.kind === "keeper") && nb.power > 0) {
-        sum += nb.power;
-        if (nb.kind === "keeper") sawKeeperContribution = true;
-      }
+      if (nb.kind === "field" && nb.power > 0) count++;        // count mines only
+      if (nb.kind === "keeper") touchesKeeper = true;          // keeper must NOT add to the count
     });
-    assert.strictEqual(cell.pressure, sum, "cell " + i + " pressure should be sum incl. keeper");
+    assert.strictEqual(cell.pressure, count, "cell " + i + " pressure should be the defender count");
+    if (touchesKeeper) checkedKeeperNeighbour = true;
   });
-  assert.ok(sawKeeperContribution, "keeper should contribute to some neighbour's pressure");
+  assert.ok(checkedKeeperNeighbour, "expected to verify at least one keeper-adjacent safe cell");
 });
 
 test("generation is deterministic for the same seed key", () => {
@@ -218,8 +215,8 @@ test("createGame returns the documented state shape; opening reveal is free + ca
   assert.strictEqual(s.status, "playing");
   assert.strictEqual(s.ballIdx, s.board.startIdx);
   assert.strictEqual(s.keeperIdx, s.board.keeperIdx);
-  assert.strictEqual(s.saves, NORMAL.startSaves);
-  assert.strictEqual(s.artifactsCollected, 0);
+  // The opening flood-fill may bank a 'save' artifact it cascades over, so saves >= startSaves.
+  assert.ok(s.saves >= NORMAL.startSaves, "saves should be at least startSaves");
   assert.ok(Array.isArray(s.events));
   assert.ok(Array.isArray(s.initialEvents));
   assert.ok(s.board.cells[s.board.startIdx].revealed, "start revealed by opening move");
@@ -232,7 +229,7 @@ test("createGame defaults to the daily (normal) preset when no cfg passed", () =
   const s = G.createGame("day:5");
   assert.strictEqual(s.board.cols, 10);
   assert.strictEqual(s.board.rows, 15);
-  assert.strictEqual(s.saves, NORMAL.startSaves);
+  assert.ok(s.saves >= NORMAL.startSaves, "saves should be at least startSaves");
 });
 
 test("the keeper is revealed but NOT passable/frontier until beaten", () => {
@@ -494,14 +491,15 @@ test("cannot mark an already-revealed cell", () => {
 test("scout returns the HUD shape: saves, defenders totals, keeperBeaten, artifactsLeft", () => {
   const s = G.createGame("day:2", NORMAL);
   const sc = G.scout(s);
-  assert.strictEqual(sc.saves, NORMAL.startSaves);
+  assert.strictEqual(sc.saves, s.saves);
+  assert.ok(sc.saves >= NORMAL.startSaves);
   assert.strictEqual(typeof sc.defendersTotal, "number");
   assert.strictEqual(typeof sc.defendersRemaining, "number");
   assert.strictEqual(sc.keeperBeaten, false);
-  // All defenders start hidden -> remaining equals total.
+  // Defenders revealed only by an opening cascade over a beaten cell are none -> remaining == total.
   assert.strictEqual(sc.defendersRemaining, sc.defendersTotal);
-  // Artifacts left equals the configured count at the start.
-  assert.strictEqual(sc.artifactsLeft, NORMAL.artifacts.save + NORMAL.artifacts.scout);
+  // Artifacts left + already-collected by the opening cascade == the configured total.
+  assert.strictEqual(sc.artifactsLeft + s.artifactsCollected, NORMAL.artifacts.save + NORMAL.artifacts.scout);
 });
 
 test("scout is a pure read and reflects collected artifacts / beaten defenders", () => {

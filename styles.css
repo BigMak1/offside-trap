@@ -16,10 +16,10 @@
   --red:   #FF4D52;
   --orange:#FF8C2B;
   --gold:  #FFD23F;
-  --font: 'Silkscreen', 'Pixelify Sans', ui-monospace, monospace;
+  --font: 'Silkscreen', 'Tiny5', ui-monospace, monospace;
 }
-/* Russian: DotGothic16 has clean Cyrillic (Silkscreen has none), so RU no longer mixes fonts. */
-html[lang="ru"] { --font: 'DotGothic16', 'Pixelify Sans', ui-monospace, monospace; }
+/* Russian: Silkscreen has no Cyrillic, so RU uses Tiny5 — a clean, neat pixel font with Cyrillic. */
+html[lang="ru"] { --font: 'Tiny5', ui-monospace, monospace; }
 html[lang="ru"] body { letter-spacing: 0; }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }

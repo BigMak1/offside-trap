@@ -25,7 +25,7 @@
         var img = new Image();
         img.onload = function () { imgs[name] = img; resolve(); };
         img.onerror = function () { reject(new Error("Failed to load " + name)); };
-        img.src = basePath + name + ".png?v=20260620";
+        img.src = basePath + name + ".png?v=20260621";
       });
     })).then(function () { return imgs; });
   }

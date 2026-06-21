@@ -357,7 +357,9 @@
     if (debugStart) el.btnDebug.classList.add("active");
     requestAnimationFrame(loop);
     if (debugStart || diffParam || dayOverride) startDaily(); else showScreen("title");
-    if (window.OT_SFX) OT_SFX.ensure();   // attempt to start music on load (plays where autoplay is allowed)
+    // NOTE: do NOT create the AudioContext on load. Safari/WebKit parks a context born outside a
+    // user gesture in an "interrupted" state that often never recovers (no sound in the itch iframe).
+    // The context is created+resumed lazily inside the first real gesture (see unlockAudio below).
   }).catch(function (err) {
     var p = document.createElement("p"); p.style.cssText = "color:#E5484D;padding:1rem;font-family:monospace";
     p.textContent = t("err_sprites", { msg: err.message }); document.body.appendChild(p);

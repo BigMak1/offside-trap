@@ -15,7 +15,8 @@
       if (!AC) return null;
       try { ctx = new AC(); } catch (e) { return null; }
     }
-    if (ctx.state === "suspended") { try { ctx.resume(); } catch (e) {} }
+    // Resume from "suspended" (autoplay-blocked) AND "interrupted" (Safari/WebKit parks it there).
+    if (ctx.state !== "running") { try { ctx.resume(); } catch (e) {} }
     startMusic();   // a track may have been queued before the context was unlocked
     return ctx;
   }

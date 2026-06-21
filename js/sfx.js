@@ -107,9 +107,14 @@
     if (muted) stopMusic(); else startMusic();
   }
 
+  // Diagnostics: current audio state (handy for "no sound" reports, esp. iframe/autoplay issues).
+  function info() {
+    return { ctx: ctx ? ctx.state : "none", muted: muted, musicUrl: musicUrl, hasSrc: !!musicSrc };
+  }
+
   var api = {
     ensure: ensure, play: play, music: music, stopMusic: stopMusic,
-    setMuted: setMuted,
+    setMuted: setMuted, info: info,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   global.OT_SFX = api;

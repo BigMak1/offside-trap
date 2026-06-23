@@ -8,4 +8,6 @@ assets/_build
 node_modules
 .playwright-mcp
 docs
+dist
+README.md
 *.log

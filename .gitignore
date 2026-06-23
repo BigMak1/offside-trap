@@ -8,19 +8,27 @@ node_modules/
 .vercel/
 .playwright-mcp/
 assets/_build/_*.png
-# packaged builds (itch.io zip, store covers) — regenerable, kept out of git
-dist/
 
-# Large input media dropped in the task folder — not part of the shipped game
-.ai/*.mp3
-.ai/*.wav
-.ai/*.ogg
+# Working docs, task notes & input media — kept local, out of the public repo
+.ai/
+docs/
+pitch.md
 
-# Temp scratch & screenshots (keep the repo clean for agents reading it)
+# Build output is regenerable and stays out of git — EXCEPT the showcase media
+# below (gameplay GIF, screenshots, TikTok clips, presentation), which we publish.
+# NOTE: dist/.itch-key (the itch.io API key) and itch-build/*.zip stay ignored.
+dist/*
+!dist/itch-assets/
+!dist/tiktok/
+!dist/presentation/
+
+# Temp scratch & screenshots at the repo root (keep the repo clean for agents).
+# Root-anchored so they don't accidentally ignore committed media under dist/.
 /*.png
-ot-*.png
-page-*.png
-screenshot*.png
+/ot-*.png
+/ot-frames*.json
+/page-*.png
+/screenshot*.png
 *.log
 *.tmp
 
